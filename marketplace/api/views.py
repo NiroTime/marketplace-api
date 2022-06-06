@@ -1,10 +1,12 @@
+from datetime import datetime, timedelta
+
 from rest_framework import generics, serializers
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
 from .models import Item
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
-                          PutItemSerializer)
+                          PutItemSerializer, SalesItemSerializer)
 
 
 class GetItemAPIView(generics.RetrieveAPIView):
@@ -86,3 +88,35 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(status=HTTP_200_OK)
+
+
+class SalesItemAPIView(generics.ListAPIView):
+    serializer_class = SalesItemSerializer
+
+    def get_queryset(self):
+        end_date = self.request.query_params.get('date')
+        if not end_date:
+            raise serializers.ValidationError
+        try:
+            end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%S.%fZ')
+        except:
+            try:
+                end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%SZ')
+            except:
+                raise serializers.ValidationError
+        start_date = end_date - timedelta(days=1)
+        queryset = Item.objects.filter(
+            type='OFFER', date__range=(start_date, end_date)
+        )
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data={"items": serializer.data})

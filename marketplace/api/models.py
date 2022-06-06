@@ -18,38 +18,61 @@ class Item(MPTTModel):
         default=None, db_index=True, related_name='children'
     )
 
-
-def update_category_price(instance):
-    """Функция изменяет состояние родителя, если изменилось состояние сына."""
-    try:
-        if instance.parent:
-            parent = Item.objects.filter(pk=instance.parent.id).first()
-            if parent:
-                if parent.get_children():
-                    new_price = 0
-                    children_count = 0
-                    for item in parent.get_children():
-                        if item.price:
-                            children_count += 1
-                            new_price += item.price
-                    try:
-                        parent.price = new_price // children_count
-                    except ZeroDivisionError:
-                        parent.price = None
-                    parent.save()
-                else:
-                    parent.price = None
-                    parent.save()
-    except Exception as err:
-        print(err)
-        logging.error(f'{instance} ошибка: {err}')
+    def __str__(self):
+        return self.name
 
 
-@receiver(post_save, sender=Item)
-def update_price_on_save(instance, **kwargs):
-    update_category_price(instance=instance)
+class RecursionHelper:
+    def __init__(self, new_price, current_offers_count):
+        self.all_offers_price = new_price
+        self.offers_count = current_offers_count
+
+    def refresh(self):
+        self.all_offers_price = 0
+        self.offers_count = 0
+
+
+average_price = RecursionHelper(0, 0)
+
+
+def all_children_price_and_count(parent):
+    """
+    Функция принимает на вход родителя, и с помощью
+    вспомогательного объекта average_price, считает сумарную стоимость
+    и количество детей.
+    """
+    children = parent.get_children()
+    if children:
+        step = 0
+        while step < len(children):
+            if children[step].type == 'OFFER':
+                average_price.all_offers_price += children[step].price
+                average_price.offers_count += 1
+            else:
+                all_children_price_and_count(children[step])
+            step += 1
+    else:
+        return None
 
 
 @receiver(post_delete, sender=Item)
-def update_price_on_delete(instance, **kwargs):
-    update_category_price(instance=instance)
+@receiver(post_save, sender=Item)
+def update_category_price(instance, **kwargs):
+    """
+    При изменении состояния ребёнка, функция вызывает изменение состояния
+    родителя.
+    """
+    try:
+        if instance.parent:
+            parent = instance.parent
+            all_children_price_and_count(parent)
+            parent.price = (
+                    average_price.all_offers_price //
+                    average_price.offers_count
+            )
+            average_price.refresh()
+            parent.save()
+    except Exception as err:
+        logging.error(
+            f'Ошибка: {err}, в функции {update_category_price.__name__}'
+        )

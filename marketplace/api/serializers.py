@@ -49,3 +49,10 @@ class DeleteItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Item
+
+
+class SalesItemSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Item
+        fields = ('id', 'name', 'type', 'parent', 'date', 'price',)

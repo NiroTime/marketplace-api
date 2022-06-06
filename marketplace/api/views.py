@@ -1,6 +1,6 @@
 from rest_framework import generics, serializers
-from rest_framework.status import HTTP_200_OK
 from rest_framework.response import Response
+from rest_framework.status import HTTP_200_OK
 
 from .models import Item
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
@@ -15,7 +15,7 @@ class GetItemAPIView(generics.RetrieveAPIView):
     def get_all_children(self, data):
         """
         Рекурсивная функция распаковывающая детей
-        у сериализованного объекта Item
+        у сериализованного объекта Item.
         """
         if data.get('children'):
             step = 0
@@ -28,6 +28,8 @@ class GetItemAPIView(generics.RetrieveAPIView):
                 step += 1
 
     def retrieve(self, request, *args, **kwargs):
+        if len(kwargs.get('pk')) != 36:
+            raise serializers.ValidationError
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         self.get_all_children(serializer.data)
@@ -71,9 +73,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
 
                 if getattr(instance, '_prefetched_objects_cache', None):
                     instance._prefetched_objects_cache = {}
-        return Response(status=HTTP_200_OK, data={
-            "message": "Вставка или обновление прошли успешно"}
-                        )
+        return Response(status=HTTP_200_OK)
 
 
 class DeleteItemAPIView(generics.DestroyAPIView):
@@ -83,11 +83,6 @@ class DeleteItemAPIView(generics.DestroyAPIView):
     def destroy(self, request, *args, **kwargs):
         if len(kwargs.get('pk')) != 36:
             raise serializers.ValidationError
-        # нужно кастомизировать ответ, чтобы выдавать:
-        # {
-        #     "code": 400,
-        #     "message": "Validation Failed"
-        # }
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(status=HTTP_200_OK)

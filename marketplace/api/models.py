@@ -1,7 +1,8 @@
+import logging
 import uuid
 
 from django.db import models
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from mptt.models import MPTTModel, TreeForeignKey
 
@@ -17,20 +18,38 @@ class Item(MPTTModel):
         default=None, db_index=True, related_name='children'
     )
 
-    def __str__(self):
-        return self.name
 
-    @receiver(post_save)
-    def update_category_price(sender, instance, **kwargs):
-        if instance.price and instance.parent:
+def update_category_price(instance):
+    """Функция изменяет состояние родителя, если изменилось состояние сына."""
+    try:
+        if instance.parent:
             parent = Item.objects.filter(pk=instance.parent.id).first()
             if parent:
-                new_price = 0
-                children_count = len(parent.get_children())
-                for item in parent.get_children():
-                    if item.price:
-                        new_price += item.price
-                parent.price = new_price // children_count
-                parent.save()
+                if parent.get_children():
+                    new_price = 0
+                    children_count = 0
+                    for item in parent.get_children():
+                        if item.price:
+                            children_count += 1
+                            new_price += item.price
+                    try:
+                        parent.price = new_price // children_count
+                    except ZeroDivisionError:
+                        parent.price = None
+                    parent.save()
+                else:
+                    parent.price = None
+                    parent.save()
+    except Exception as err:
+        print(err)
+        logging.error(f'{instance} ошибка: {err}')
 
 
+@receiver(post_save, sender=Item)
+def update_price_on_save(instance, **kwargs):
+    update_category_price(instance=instance)
+
+
+@receiver(post_delete, sender=Item)
+def update_price_on_delete(instance, **kwargs):
+    update_category_price(instance=instance)

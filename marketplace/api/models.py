@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 
 from django.db import models
@@ -52,18 +53,20 @@ def all_children_price_and_count(parent):
     вспомогательного объекта average_price, считает сумарную стоимость
     и количество детей.
     """
-    children = parent.get_children()
-    if children:
-        step = 0
-        while step < len(children):
-            if children[step].type == 'OFFER':
-                average_price.all_offers_price += children[step].price
-                average_price.offers_count += 1
-            else:
-                all_children_price_and_count(children[step])
-            step += 1
-    else:
-        return None
+    try:
+        children = parent.get_children()
+        if children:
+            step = 0
+            while step < len(children):
+                if children[step].type == 'OFFER':
+                    average_price.all_offers_price += children[step].price
+                    average_price.offers_count += 1
+                else:
+                    all_children_price_and_count(children[step])
+                step += 1
+    except Exception as err:
+        print(err)
+        pass
 
 
 @receiver(post_delete, sender=Item)
@@ -73,15 +76,24 @@ def update_category_price(instance, **kwargs):
     При изменении состояния ребёнка, функция вызывает изменение состояния
     родителя.
     """
+    ## где-то страдает логика, при удаление эелементов не всегда работает
     try:
+        ## первый трай нужен, когда мы удаляем категорию, но её дети вызывают
+        ## instance.parent который уже удалён.
         if instance.parent:
             parent = instance.parent
             all_children_price_and_count(parent)
-            parent.price = (
-                    average_price.all_offers_price //
-                    average_price.offers_count
-            )
+            try:
+                parent.price = (
+                        average_price.all_offers_price //
+                        average_price.offers_count
+                )
+            except ZeroDivisionError:
+                parent.price = None
             average_price.refresh()
+            ## как различить делит и сейв сигналы?
+            ## при делит сигнале нужно parent.date = datetime.now()
+            ## из-за этого не архивируются изменеия при удалении
             parent.date = instance.date
             parent.save()
     except Exception as err:
@@ -106,15 +118,16 @@ def create_item_old_version(instance, **kwargs):
         type=instance.type,
         parent=str(instance.parent),
     )
+    ## ахитектурно выглядит плохо, но не могу придумать ничего лучше
     if exist_old_version:
         # страховка от дублирования архивных записей, в случае, если
-        # в одном пост запросе этот объект изменяля многократно.
+        # в одном запросе этот объект изменяля многократно.
         if exist_old_version.date == instance.date:
             exist_old_version.price = instance.price
             exist_old_version.save()
-            # логика ломается, если в одном POST запросе придёт несколько
-            # обновлений одного товара, не понимаю нужно ли это архивировать
-            # как несколько изменений, или как одно
+            ## логика ломается, если в одном POST запросе придёт несколько
+            ## обновлений одного товара, не понимаю нужно ли это архивировать
+            ## как несколько изменений, или как одно
         else:
             old_version.save()
     else:

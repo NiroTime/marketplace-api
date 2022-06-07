@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
 from .models import Item, ItemOldVersions
-from .utils import uuid_validate
+from .utils import ChangedListAPIView, uuid_validate
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
                           SalesItemSerializer)
@@ -55,6 +55,24 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             raise serializers.ValidationError
 
         for item in request.data['items']:
+            # Проверяем что parentID у всех итемов в запросе либо в базе,
+            # либо в текущем запросе, либо отсутствует, иначе ValidationError
+            if (item.get('parentId') and item.get('parentId') != "Null"
+                    and item.get('parentId') != "None"):
+                parent_in_db = Item.objects.filter(pk=item['parentId']).first()
+                if not parent_in_db:
+                    flag = False
+                    for another_item in request.data['items']:
+                        if ((another_item['id'] == item['parentId'])
+                                and (another_item['type'] == 'CATEGORY')):
+                            flag = True
+                            break
+                    if not flag:
+                        raise serializers.ValidationError
+        ## по условию задачи итемы идут неупорядачено, то есть мне нельзя
+        ## создавать их по очереди, нужно создавать только если нет родителя
+        ## или он уже в базе
+        for item in request.data['items']:
             item['date'] = request.data['updateDate']
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
@@ -70,16 +88,16 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             current_item = Item.objects.filter(pk=item['id']).first()
             if not current_item:
                 serializer = self.get_serializer(data=item)
-                serializer.is_valid(raise_exception=True)
-                self.perform_create(serializer)
             else:
                 instance = current_item
                 serializer = self.get_serializer(instance, data=item)
-                serializer.is_valid(raise_exception=True)
-                self.perform_update(serializer)
-
+                ## не понимаю что делают эти строчки, может их можно удалить?
                 if getattr(instance, '_prefetched_objects_cache', None):
                     instance._prefetched_objects_cache = {}
+
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+
         return Response(status=HTTP_200_OK)
 
 
@@ -96,7 +114,7 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         return Response(status=HTTP_200_OK)
 
 
-class SalesItemAPIView(generics.ListAPIView):
+class SalesItemAPIView(ChangedListAPIView):
     serializer_class = SalesItemSerializer
     throttle_scope = 'contacts'
 
@@ -117,18 +135,8 @@ class SalesItemAPIView(generics.ListAPIView):
         )
         return queryset
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(data={"items": serializer.data})
-
-
-class ItemStatisticAPIView(generics.ListAPIView):
+class ItemStatisticAPIView(ChangedListAPIView):
     serializer_class = ItemStatisticSerializer
     throttle_scope = 'contacts'
 
@@ -143,13 +151,3 @@ class ItemStatisticAPIView(generics.ListAPIView):
         if not queryset:
             raise Http404
         return queryset
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(data={"items": serializer.data})

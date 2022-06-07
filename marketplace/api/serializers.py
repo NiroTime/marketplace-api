@@ -29,7 +29,7 @@ class PutItemSerializer(serializers.ModelSerializer):
         if (data['type'] == 'OFFER') and not (data.get('price')):
             raise serializers.ValidationError
 
-        # Проверяем валидность переданного parentId
+        # проверяем что parentId ссылается на категорию
         if data.get('parentId'):
             parent_item = get_object_or_404(Item, pk=data['id'])
             if parent_item.type != 'CATEGORY':

@@ -83,7 +83,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             if 'parentId' in item.keys():
                 parent = item.get('parentId')
                 if parent and (parent not in ("None", "Null")):
-                    item['parent'] = item['parentId']
+                    item['parent'] = parent
             # Если объект уже существует: редактируем, иначе создаём
             current_item = Item.objects.filter(pk=item['id']).first()
             if not current_item:
@@ -97,7 +97,9 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
 
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
-
+        ## если вот тут вызывать функцию, которая будет перерасчитывать
+        ## цену категории, то это может сильно сократить нагрузу на БД
+        ## т.к сигналы вызваются при добавлении каждого объекта.
         return Response(status=HTTP_200_OK)
 
 

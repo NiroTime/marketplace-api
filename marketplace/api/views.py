@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta
 
+from django.http import Http404
 from rest_framework import generics, serializers
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
-from .models import Item
+from .models import Item, ItemOldVersions
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
-                          PutItemSerializer, SalesItemSerializer)
+                          PutItemSerializer, SalesItemSerializer,
+                          ItemStatisticSerializer,)
 
 
 class GetItemAPIView(generics.RetrieveAPIView):
@@ -112,7 +114,32 @@ class SalesItemAPIView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data={"items": serializer.data})
+
+
+class ItemStatisticAPIView(generics.ListAPIView):
+    serializer_class = ItemStatisticSerializer
+
+    def get_queryset(self):
+        if not self.kwargs.get('pk'):
+            raise serializers.ValidationError
+        if len(self.kwargs.get('pk')) != 36:
+            raise serializers.ValidationError
+        queryset = ItemOldVersions.objects.filter(
+            actual_version=str(self.kwargs.get('pk'))
+        )
+        if not queryset:
+            raise Http404
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

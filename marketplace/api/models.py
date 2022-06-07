@@ -12,7 +12,7 @@ class Item(MPTTModel):
     name = models.CharField('Название', max_length=300)
     price = models.IntegerField('Цена', null=True, blank=True, default=None)
     date = models.DateTimeField()
-    type = models.CharField(max_length=20)
+    type = models.CharField(max_length=50)
     parent = TreeForeignKey(
         'self', on_delete=models.CASCADE, null=True, blank=True,
         default=None, db_index=True, related_name='children'
@@ -22,9 +22,21 @@ class Item(MPTTModel):
         return self.name
 
 
+class ItemOldVersions(models.Model):
+    actual_version = models.CharField(max_length=36)
+    name = models.CharField(max_length=300)
+    price = models.IntegerField(null=True, blank=True, default=None)
+    date = models.DateTimeField()
+    type = models.CharField(max_length=50)
+    parent = models.CharField(max_length=36)
+
+    class Meta:
+        ordering = ['-date']
+
+
 class RecursionHelper:
-    def __init__(self, new_price, current_offers_count):
-        self.all_offers_price = new_price
+    def __init__(self, all_offers_price, current_offers_count):
+        self.all_offers_price = all_offers_price
         self.offers_count = current_offers_count
 
     def refresh(self):
@@ -71,8 +83,40 @@ def update_category_price(instance, **kwargs):
                     average_price.offers_count
             )
             average_price.refresh()
+            parent.date = instance.date
             parent.save()
     except Exception as err:
         logging.error(
             f'Ошибка: {err}, в функции {update_category_price.__name__}'
         )
+
+
+@receiver(post_save, sender=Item)
+def create_item_old_version(instance, **kwargs):
+    exist_old_version = ItemOldVersions.objects.filter(
+        actual_version=str(instance.id)
+    ).first()
+    old_version = ItemOldVersions(
+        actual_version=str(instance.id),
+        name=instance.name,
+        price=instance.price,
+        date=instance.date,
+        type=instance.type,
+        parent=str(instance.parent),
+    )
+    if exist_old_version:
+        if exist_old_version.date == instance.date:
+            exist_old_version.price = instance.price
+            exist_old_version.save()
+        else:
+            old_version.save()
+    else:
+        old_version.save()
+
+
+@receiver(post_delete, sender=Item)
+def delete_all_old_version_on_item_delete(instance, **kwargs):
+    old_versions = ItemOldVersions.objects.filter(
+        actual_version=instance.id
+    )
+    old_versions.delete()

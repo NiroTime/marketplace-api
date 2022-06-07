@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Item
+from .models import Item, ItemOldVersions
 
 
 class GetItemSerializer(serializers.ModelSerializer):
@@ -55,4 +55,12 @@ class SalesItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Item
+        fields = ('id', 'name', 'type', 'parent', 'date', 'price',)
+
+
+class ItemStatisticSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(source='actual_version')
+
+    class Meta:
+        model = ItemOldVersions
         fields = ('id', 'name', 'type', 'parent', 'date', 'price',)

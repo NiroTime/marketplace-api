@@ -1,5 +1,4 @@
 import logging
-import uuid
 
 from django.db import models
 from django.db.models.signals import post_delete, post_save
@@ -8,7 +7,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 
 
 class Item(MPTTModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=True)
+    id = models.UUIDField(primary_key=True, editable=True)
     name = models.CharField('Название', max_length=300)
     price = models.IntegerField('Цена', null=True, blank=True, default=None)
     date = models.DateTimeField()
@@ -93,6 +92,9 @@ def update_category_price(instance, **kwargs):
 
 @receiver(post_save, sender=Item)
 def create_item_old_version(instance, **kwargs):
+    """
+    Функция создаёт архинвую версию товара/категории, при создание/обновлении.
+    """
     exist_old_version = ItemOldVersions.objects.filter(
         actual_version=str(instance.id)
     ).first()
@@ -105,9 +107,14 @@ def create_item_old_version(instance, **kwargs):
         parent=str(instance.parent),
     )
     if exist_old_version:
+        # страховка от дублирования архивных записей, в случае, если
+        # в одном пост запросе этот объект изменяля многократно.
         if exist_old_version.date == instance.date:
             exist_old_version.price = instance.price
             exist_old_version.save()
+            # логика ломается, если в одном POST запросе придёт несколько
+            # обновлений одного товара, не понимаю нужно ли это архивировать
+            # как несколько изменений, или как одно
         else:
             old_version.save()
     else:
@@ -116,7 +123,10 @@ def create_item_old_version(instance, **kwargs):
 
 @receiver(post_delete, sender=Item)
 def delete_all_old_version_on_item_delete(instance, **kwargs):
+    """
+    Функция удаляет архивные данные, если был удалён товар/категория.
+    """
     old_versions = ItemOldVersions.objects.filter(
-        actual_version=instance.id
+        actual_version=str(instance.id)
     )
     old_versions.delete()

@@ -1,8 +1,7 @@
 from django.urls import path
 
-from .views import (DeleteItemAPIView, GetItemAPIView,
-                    PutItemAPIView, SalesItemAPIView,
-                    ItemStatisticAPIView,)
+from .views import (DeleteItemAPIView, GetItemAPIView, ItemStatisticAPIView,
+                    PutItemAPIView, SalesItemAPIView)
 
 urlpatterns = [
     path('nodes/<str:pk>', GetItemAPIView.as_view()),

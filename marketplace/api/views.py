@@ -6,15 +6,17 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
 from .models import Item, ItemOldVersions
+from .utils import uuid_validate
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
-                          PutItemSerializer, SalesItemSerializer,
-                          ItemStatisticSerializer,)
+                          ItemStatisticSerializer, PutItemSerializer,
+                          SalesItemSerializer)
 
 
 class GetItemAPIView(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = Item.objects.all()
     serializer_class = GetItemSerializer
+    throttle_scope = 'contacts'
 
     def get_all_children(self, data):
         """
@@ -32,7 +34,7 @@ class GetItemAPIView(generics.RetrieveAPIView):
                 step += 1
 
     def retrieve(self, request, *args, **kwargs):
-        if len(kwargs.get('pk')) != 36:
+        if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
         serializer = self.get_serializer(instance)
@@ -44,6 +46,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
     http_method_names = ['post']
     queryset = Item.objects.all()
     serializer_class = PutItemSerializer
+    throttle_scope = 'uploads'
 
     def create(self, request, *args, **kwargs):
         if (not request.data.get('items')) or not (
@@ -83,9 +86,10 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
 class DeleteItemAPIView(generics.DestroyAPIView):
     queryset = Item.objects.all()
     serializer_class = DeleteItemSerializer
+    throttle_scope = 'uploads'
 
     def destroy(self, request, *args, **kwargs):
-        if len(kwargs.get('pk')) != 36:
+        if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
         self.perform_destroy(instance)
@@ -94,6 +98,7 @@ class DeleteItemAPIView(generics.DestroyAPIView):
 
 class SalesItemAPIView(generics.ListAPIView):
     serializer_class = SalesItemSerializer
+    throttle_scope = 'contacts'
 
     def get_queryset(self):
         end_date = self.request.query_params.get('date')
@@ -125,11 +130,12 @@ class SalesItemAPIView(generics.ListAPIView):
 
 class ItemStatisticAPIView(generics.ListAPIView):
     serializer_class = ItemStatisticSerializer
+    throttle_scope = 'contacts'
 
     def get_queryset(self):
         if not self.kwargs.get('pk'):
             raise serializers.ValidationError
-        if len(self.kwargs.get('pk')) != 36:
+        if not uuid_validate(self.kwargs.get('pk')):
             raise serializers.ValidationError
         queryset = ItemOldVersions.objects.filter(
             actual_version=str(self.kwargs.get('pk'))

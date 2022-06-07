@@ -1,3 +1,5 @@
+import re
+
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -20,3 +22,14 @@ def custom_exception_handler(exc, context):
         return Response(status=404, data=data)
     response = exception_handler(exc, context)
     return response
+
+
+def uuid_validate(string):
+    if not (
+        re.match(
+            r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+            string
+        )
+    ):
+        return False
+    return True

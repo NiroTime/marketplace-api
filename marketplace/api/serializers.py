@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 
 from .models import Item, ItemOldVersions
@@ -30,9 +31,7 @@ class PutItemSerializer(serializers.ModelSerializer):
 
         # Проверяем валидность переданного parentId
         if data.get('parentId'):
-            parent_item = Item.objects.filter(pk=data['id']).first()
-            if not parent_item:
-                raise serializers.ValidationError
+            parent_item = get_object_or_404(Item, pk=data['id'])
             if parent_item.type != 'CATEGORY':
                 raise serializers.ValidationError
 
@@ -41,7 +40,6 @@ class PutItemSerializer(serializers.ModelSerializer):
         if current_item:
             if current_item.type != data['type']:
                 raise serializers.ValidationError
-
         return data
 
 

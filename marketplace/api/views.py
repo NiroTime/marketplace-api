@@ -24,6 +24,8 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
+        if not instance.children:
+            instance.children = None
         serializer = self.get_serializer(instance)
         self.get_all_children(serializer.data)
         return Response(serializer.data)
@@ -45,7 +47,11 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             raise serializers.ValidationError
 
         for item in request.data['items']:
-            item['date'] = request.data['updateDate']
+            if not validate_date(request.data['updateDate']):
+                raise serializers.ValidationError
+            item['date'] = validate_date(
+                request.data['updateDate']
+            ) + timedelta(milliseconds=0)
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
                 price = item.get('price')
@@ -104,7 +110,9 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                         parent = None
                     else:
                         parent = Item.objects.get(pk=item.get('parent'))
-                    self.perform_create(serializer.save(parent=parent))
+                    self.perform_create(
+                        serializer.save(parent=parent, date=item['date'])
+                    )
                     temp_data.append(serializer.validated_data.get('id'))
                     request_list.remove(item)
                     step = 0
@@ -147,8 +155,10 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
+        print(type(instance))
         ancestors = instance.get_ancestors()
         self.perform_destroy(instance)
+        print(ancestors)
         for item in ancestors:
             item.price = avg_children_price(item)
             item.date = datetime.utcnow().replace(microsecond=0)

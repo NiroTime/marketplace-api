@@ -106,7 +106,8 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
                 data.get('children')[step] = child
                 self.get_all_children(child)
                 step += 1
-
+        else:
+            data['children'] = None
 
 class ItemNotInDBError(Exception):
     pass

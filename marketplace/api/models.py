@@ -86,6 +86,7 @@ def create_item_old_version(instance, **kwargs):
     exist_old_version = ItemOldVersions.objects.filter(
         actual_version=str(instance.id)
     ).first()
+    print(exist_old_version)
     new_version = ItemOldVersions(
         actual_version=str(instance.id),
         name=instance.name,
@@ -104,7 +105,8 @@ def create_item_old_version(instance, **kwargs):
             exist_old_version.save()
             ## логика ломается, если в одном POST запросе придёт несколько
             ## обновлений одного товара, не понимаю нужно ли это архивировать
-            ## как несколько изменений, или как одно
+            ## как несколько изменений, или как одно, и является ли такой
+            ## запрос валидным
         else:
             print('\n', new_version, new_version.date, exist_old_version.date, 'create')
             new_version.save()

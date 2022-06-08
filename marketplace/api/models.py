@@ -36,7 +36,7 @@ class ItemOldVersions(models.Model):
 
 ## кажется эту функцию стоит убрать в utils, но пока оставил здесь
 ## для наглядности
-def all_children_price_and_count(parent):
+def avg_children_price(parent):
     """
     Функция принимает на вход родителя, считает сумарную стоимость
     и количество детей, возвращает среднюю стоимость или None, если
@@ -58,12 +58,16 @@ def all_children_price_and_count(parent):
             return all_offers_price // offers_count
         except ZeroDivisionError:
             return None
-
+    return None
 
 ## Ощущение, что хранить сигналы стоит в отдельно файле, пробовал создать
 ## signals.py но почему то там сигналы не приходили, при таком же синтаксисе
+
+## От сигналов точно нужно избавляться, и переносить логику обновления
+## категори в конец вьюхи пост запроса, даже при 20 итемах в базе, ответ
+## постмана уже 500мс
 @receiver(post_save, sender=Item)
-def update_category_price(instance, **kwargs):
+def update_parent_category_price_on_save(instance, **kwargs):
     """
     При изменении состояния ребёнка, функция вызывает изменение состояния
     родителя.
@@ -74,7 +78,7 @@ def update_category_price(instance, **kwargs):
         ## instance.parent который уже удалён.
         if instance.parent:
             parent = instance.parent
-            parent.price = all_children_price_and_count(parent)
+            parent.price = avg_children_price(parent)
             ## как различить делит и сейв сигналы?
             ## при делит сигнале нужно parent.date = datetime.now()
             ## из-за этого не архивируются изменеия при удалении
@@ -82,23 +86,24 @@ def update_category_price(instance, **kwargs):
             parent.save()
     except Exception as err:
         logging.error(
-            f'Ошибка: {err}, в функции {update_category_price.__name__}'
+            f'Ошибка: {err}, в функции '
+            f'{update_parent_category_price_on_save.__name__}'
         )
 
 
 @receiver(post_delete, sender=Item)
-def update_category_price(instance, **kwargs):
+def update_parent_category_price_on_delete(instance, **kwargs):
     signal_time = datetime.utcnow().replace(microsecond=0)
-    print(signal_time)
     try:
         if instance.parent:
             parent = instance.parent
-            parent.price = all_children_price_and_count(parent)
+            parent.price = avg_children_price(parent)
             parent.date = signal_time
             parent.save()
     except Exception as err:
         logging.error(
-            f'Ошибка: {err}, в функции {update_category_price.__name__}'
+            f'Ошибка: {err}, в функции '
+            f'{update_parent_category_price_on_delete.__name__}'
         )
 
 

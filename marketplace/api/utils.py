@@ -48,3 +48,7 @@ class ChangedListAPIView(generics.ListAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(data={"items": serializer.data})
+
+
+class ItemNotInDBError(Exception):
+    pass

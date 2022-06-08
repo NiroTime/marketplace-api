@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
 from .models import Item, ItemOldVersions
-from .utils import ChangedListAPIView, uuid_validate
+from .utils import ChangedListAPIView, uuid_validate, ItemNotInDBError
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
                           SalesItemSerializer)
@@ -126,10 +126,14 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     type=serializer.validated_data.get('type'),
                     parent=serializer.validated_data.get('parent'),
                 ))
-                self.perform_create(serializer.save(parent=item.get('parent')))
-                request_list.remove(item)
-                step = 0
-            except:
+                try:
+                    self.perform_create(serializer.save(parent=item.get('parent')))
+                    request_list.remove(item)
+                    step = 0
+                except Exception as err:
+                    print(err)
+                    raise ItemNotInDBError
+            except ItemNotInDBError:
                 step += 1
         ## очень хочется показать, что я знаю, что такое bulk_create,
         ## но он не умеет понимать когда сохранять, а когда создавать(

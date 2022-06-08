@@ -18,6 +18,9 @@ class GetItemAPIView(generics.RetrieveAPIView):
     serializer_class = GetItemSerializer
     throttle_scope = 'contacts'
 
+    ## можно переопределить RetrieveAPIView в utils вместе с этим методом,
+    ## чтобы сократить количество кода в views но в плане наглядности,
+    ## не уверен что это норм
     def get_all_children(self, data):
         """
         Рекурсивная функция распаковывающая детей
@@ -69,6 +72,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                             break
                     if not flag:
                         raise serializers.ValidationError
+
         ## по условию задачи итемы идут неупорядачено, то есть мне нельзя
         ## создавать их по очереди, нужно создавать только если нет родителя
         ## или он уже в базе
@@ -124,6 +128,10 @@ class SalesItemAPIView(ChangedListAPIView):
         end_date = self.request.query_params.get('date')
         if not end_date:
             raise serializers.ValidationError
+        ## думал воспользоваться dateutil, но не до конца понимаю, стоит ли
+        ## пытаться обработать запросы кроме этих 2х форматов?
+        ## если не пользоваться dateutil, стоит ли вынести эти 2 блока
+        ## как функцию в utils?
         try:
             end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%S.%fZ')
         except:

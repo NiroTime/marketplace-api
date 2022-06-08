@@ -34,24 +34,11 @@ class ItemOldVersions(models.Model):
         ordering = ['-date']
 
 
-# class RecursionHelper:
-#     def __init__(self, all_offers_price, current_offers_count):
-#         self.all_offers_price = all_offers_price
-#         self.offers_count = current_offers_count
-#
-#     def refresh(self):
-#         self.all_offers_price = 0
-#         self.offers_count = 0
-#
-#
-# average_price = RecursionHelper(0, 0)
-
-
 def all_children_price_and_count(parent):
     """
-    Функция принимает на вход родителя, и с помощью
-    вспомогательного объекта average_price, считает сумарную стоимость
-    и количество детей.
+    Функция принимает на вход родителя, считает сумарную стоимость
+    и количество детей, возвращает среднюю стоимость или None, если
+    у категории нет детей с типом OFFER.
     """
     try:
         children = parent.get_descendants()

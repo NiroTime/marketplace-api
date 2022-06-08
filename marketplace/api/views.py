@@ -49,6 +49,9 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
     http_method_names = ['post']
     queryset = Item.objects.all()
     serializer_class = PutItemSerializer
+    ## ощущение, что в тз хотят ограничение именно на количество иметов=1000
+    ## а у меня количество запросов=1000, не разобрался пока как расширять
+    ## throttle функционал
     throttle_scope = 'uploads'
 
     def create(self, request, *args, **kwargs):
@@ -139,7 +142,7 @@ class SalesItemAPIView(ChangedListAPIView):
             raise serializers.ValidationError
         ## думал воспользоваться dateutil, но не до конца понимаю, стоит ли
         ## пытаться обработать запросы кроме этих 2х форматов?
-        ## если не пользоваться dateutil, стоит ли вынести эти 2 блока
+        ## если не пользоваться dateutil, стоит ли вынести эти 2 блока try
         ## как функцию в utils?
         try:
             end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%S.%fZ')

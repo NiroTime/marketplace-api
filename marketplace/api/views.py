@@ -49,9 +49,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
         for item in request.data['items']:
             if not validate_date(request.data['updateDate']):
                 raise serializers.ValidationError
-            item['date'] = validate_date(
-                request.data['updateDate']
-            ) + timedelta(milliseconds=0)
+            item['date'] = validate_date(request.data['updateDate'])
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
                 price = item.get('price')
@@ -60,8 +58,6 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             # Добавляем ключ parent если он определён
             if 'parentId' in item.keys():
                 parent = item.get('parentId')
-                ## пояснение: в дальнейшем мы будем пользоваться только parent
-                ## поэтому ключ parentId мы не удаляем
                 if parent and (parent not in ("None", "Null")):
                     item['parent'] = parent
             # Проверяем что parentID у всех итемов в запросе либо в базе,
@@ -80,13 +76,18 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     if not flag:
                         raise serializers.ValidationError
 
-        ## по условию задачи итемы идут неупорядачено, то есть мне нельзя
-        ## создавать их по очереди, нужно создавать только если нет родителя
-        ## или он уже в базе
         request_list = list(request.data['items'])
         temp_data = []
         step = 0
         while len(request_list) > 0:
+            ## нашёл критическую ошибку в моём подходе:
+            ## если хоть один item из списка будет невалиден,
+            ## и он будет не первым в списке на создание,
+            ## то у меня часть объектов создатся, а чать нет.
+            ## прихожу к выводу, что нужно делать полную валидацию всех
+            ## полей каждого объекта, перед тем как отправить их в цикл
+            ## создания, но если я руками пишу валидацию, зачем мне вообще
+            ## сериалайзеры...
             try:
                 # проверяем валидность Item, контолируем поведение, если
                 # родитель находится в запросе, а не в базе данных
@@ -126,8 +127,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     raise ItemNotInDBError
             except ItemNotInDBError:
                 step += 1
-        ## очень хочется показать, что я знаю, что такое bulk_create,
-        ## но он не умеет понимать когда сохранять, а когда создавать
+
         ancestors = []
         # Обновляем родителей, затронутых изменениями
         for item_id in temp_data:
@@ -161,7 +161,7 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         print(ancestors)
         for item in ancestors:
             item.price = avg_children_price(item)
-            item.date = datetime.utcnow().replace(microsecond=0)
+            item.date = datetime.utcnow()
             item.save()
         return Response(status=HTTP_200_OK)
 
@@ -181,6 +181,8 @@ class SalesItemAPIView(ChangedListAPIView):
         queryset = Item.objects.filter(
             type='OFFER', date__range=(start_date, end_date)
         )
+        if not queryset:
+            raise Http404
         return queryset
 
 

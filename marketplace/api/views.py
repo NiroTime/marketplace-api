@@ -98,12 +98,18 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                 current_item = Item.objects.filter(pk=item['id']).first()
                 if not current_item:
                     serializer = self.get_serializer(data=item)
-                    ## краевой случай
+                    ## краевой случай:
+                    ## при запросе в котором есть и родитель и ребёнок
+                    ## у меня всегда будет validationError т.к. я не создаю
+                    ## объект в базе, а только добавляю его в temp_data
+                    ## выход вижу в том, чтобы переопределить валидацию,
+                    ## использую не только родителей в базе, но и в temp_data
+                    ## но пока не понял как
                     serializer.is_valid(raise_exception=True)
                 else:
                     instance = current_item
                     serializer = self.get_serializer(instance, data=item)
-                    ## краевой случай
+                    ## краевой случай см. выше
                     serializer.is_valid(raise_exception=True)
                     if getattr(instance, '_prefetched_objects_cache', None):
                         instance._prefetched_objects_cache = {}

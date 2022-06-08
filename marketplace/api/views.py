@@ -5,7 +5,7 @@ from rest_framework import generics, serializers
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
-from .models import Item, ItemOldVersions
+from .models import Item, ItemOldVersions, avg_children_price
 from .utils import ChangedListAPIView, uuid_validate, ItemNotInDBError
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
@@ -31,6 +31,8 @@ class GetItemAPIView(generics.RetrieveAPIView):
             while step < len(data.get('children')):
                 item = Item.objects.filter(
                     pk=data.get('children')[step]).first()
+                if item.type == 'CATEGORY':
+                    item.price = avg_children_price(item)
                 child = self.get_serializer(item).data
                 data.get('children')[step] = child
                 self.get_all_children(child)
@@ -40,6 +42,8 @@ class GetItemAPIView(generics.RetrieveAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
+        if instance.type == 'CATEGORY':
+            instance.price = avg_children_price(instance)
         serializer = self.get_serializer(instance)
         self.get_all_children(serializer.data)
         return Response(serializer.data)

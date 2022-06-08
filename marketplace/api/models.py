@@ -34,6 +34,8 @@ class ItemOldVersions(models.Model):
         ordering = ['-date']
 
 
+## кажется эту функцию стоит убрать в utils, но пока оставил здесь
+## для наглядности
 def all_children_price_and_count(parent):
     """
     Функция принимает на вход родителя, считает сумарную стоимость
@@ -58,6 +60,8 @@ def all_children_price_and_count(parent):
             return None
 
 
+## Ощущение, что хранить сигналы стоит в отдельно файле, пробовал создать
+## signals.py но почему то там сигналы не приходили, при таком же синтаксисе
 @receiver(post_save, sender=Item)
 def update_category_price(instance, **kwargs):
     """

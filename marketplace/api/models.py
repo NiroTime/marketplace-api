@@ -34,17 +34,17 @@ class ItemOldVersions(models.Model):
         ordering = ['-date']
 
 
-class RecursionHelper:
-    def __init__(self, all_offers_price, current_offers_count):
-        self.all_offers_price = all_offers_price
-        self.offers_count = current_offers_count
-
-    def refresh(self):
-        self.all_offers_price = 0
-        self.offers_count = 0
-
-
-average_price = RecursionHelper(0, 0)
+# class RecursionHelper:
+#     def __init__(self, all_offers_price, current_offers_count):
+#         self.all_offers_price = all_offers_price
+#         self.offers_count = current_offers_count
+#
+#     def refresh(self):
+#         self.all_offers_price = 0
+#         self.offers_count = 0
+#
+#
+# average_price = RecursionHelper(0, 0)
 
 
 def all_children_price_and_count(parent):
@@ -54,22 +54,23 @@ def all_children_price_and_count(parent):
     и количество детей.
     """
     try:
-        children = parent.get_children()
-        if children:
-            step = 0
-            while step < len(children):
-                if children[step].type == 'OFFER':
-                    average_price.all_offers_price += children[step].price
-                    average_price.offers_count += 1
-                else:
-                    all_children_price_and_count(children[step])
-                step += 1
+        children = parent.get_descendants()
     except Exception as err:
-        print(err)
-        pass
+        logging.error(f'ошибка:{err}')
+        children = None
+    if children:
+        all_offers_price = 0
+        offers_count = 0
+        for item in children:
+            if item.type == 'OFFER':
+                all_offers_price += item.price
+                offers_count += 1
+        try:
+            return all_offers_price // offers_count
+        except ZeroDivisionError:
+            return None
 
 
-@receiver(post_delete, sender=Item)
 @receiver(post_save, sender=Item)
 def update_category_price(instance, **kwargs):
     """
@@ -82,19 +83,27 @@ def update_category_price(instance, **kwargs):
         ## instance.parent который уже удалён.
         if instance.parent:
             parent = instance.parent
-            all_children_price_and_count(parent)
-            try:
-                parent.price = (
-                        average_price.all_offers_price //
-                        average_price.offers_count
-                )
-            except ZeroDivisionError:
-                parent.price = None
-            average_price.refresh()
+            parent.price = all_children_price_and_count(parent)
             ## как различить делит и сейв сигналы?
             ## при делит сигнале нужно parent.date = datetime.now()
             ## из-за этого не архивируются изменеия при удалении
             parent.date = instance.date
+            parent.save()
+    except Exception as err:
+        logging.error(
+            f'Ошибка: {err}, в функции {update_category_price.__name__}'
+        )
+
+
+@receiver(post_delete, sender=Item)
+def update_category_price(instance, **kwargs):
+    signal_time = datetime.utcnow().replace(microsecond=0)
+    print(signal_time)
+    try:
+        if instance.parent:
+            parent = instance.parent
+            parent.price = all_children_price_and_count(parent)
+            parent.date = signal_time
             parent.save()
     except Exception as err:
         logging.error(

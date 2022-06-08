@@ -1,6 +1,3 @@
-from datetime import datetime
-import logging
-
 from django.db import models
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -34,35 +31,8 @@ class ItemOldVersions(models.Model):
         ordering = ['-date']
 
 
-## кажется эту функцию стоит убрать в utils, но пока оставил здесь
-## для наглядности
-def avg_children_price(parent):
-    """
-    Функция принимает на вход родителя, считает сумарную стоимость
-    и количество детей, возвращает среднюю стоимость или None, если
-    у категории нет детей с типом OFFER.
-    """
-    try:
-        children = parent.get_descendants()
-    except Exception as err:
-        logging.error(f'ошибка:{err}')
-        children = None
-    if children:
-        all_offers_price = 0
-        offers_count = 0
-        for item in children:
-            if item.type == 'OFFER':
-                all_offers_price += item.price
-                offers_count += 1
-        try:
-            return all_offers_price // offers_count
-        except ZeroDivisionError:
-            return None
-    return None
-
 ## Ощущение, что хранить сигналы стоит в отдельно файле, пробовал создать
 ## signals.py но почему то там сигналы не приходили, при таком же синтаксисе
-
 
 ## От сигналов точно нужно избавляться, и переносить логику обновления
 ## категори в конец вьюхи пост запроса, даже при 20 итемах в базе, ответ

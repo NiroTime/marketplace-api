@@ -5,38 +5,19 @@ from rest_framework import generics, serializers
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
-from .models import Item, ItemOldVersions, avg_children_price
-from .utils import ChangedListAPIView, uuid_validate, ItemNotInDBError
+from .models import Item, ItemOldVersions
+from .utils import (avg_children_price, ChangedListAPIView,
+                    uuid_validate, ItemNotInDBError, ChangedRetrieveAPIView,)
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
-                          SalesItemSerializer)
+                          SalesItemSerializer,)
 
 
-class GetItemAPIView(generics.RetrieveAPIView):
+class GetItemAPIView(ChangedRetrieveAPIView):
     http_method_names = ['get']
     queryset = Item.objects.all()
     serializer_class = GetItemSerializer
     throttle_scope = 'contacts'
-
-    ## можно переопределить RetrieveAPIView в utils вместе с этим методом,
-    ## чтобы сократить количество кода в views но в плане наглядности,
-    ## не уверен что это норм
-    def get_all_children(self, data):
-        """
-        Рекурсивная функция распаковывающая детей
-        у сериализованного объекта Item.
-        """
-        if data.get('children'):
-            step = 0
-            while step < len(data.get('children')):
-                item = Item.objects.filter(
-                    pk=data.get('children')[step]).first()
-                if item.type == 'CATEGORY':
-                    item.price = avg_children_price(item)
-                child = self.get_serializer(item).data
-                data.get('children')[step] = child
-                self.get_all_children(child)
-                step += 1
 
     def retrieve(self, request, *args, **kwargs):
         if not uuid_validate(kwargs.get('pk')):
@@ -97,8 +78,8 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
         ## по условию задачи итемы идут неупорядачено, то есть мне нельзя
         ## создавать их по очереди, нужно создавать только если нет родителя
         ## или он уже в базе
-        temp_data = []
         request_list = list(request.data['items'])
+        temp_data = []
         step = 0
         while len(request_list) > 0:
             try:
@@ -142,10 +123,9 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                 step += 1
         ## очень хочется показать, что я знаю, что такое bulk_create,
         ## но он не умеет понимать когда сохранять, а когда создавать(
-
+        print(temp_data)
         # for item in temp_data:
         #     item.save()
-        print(temp_data)
         ## если вот тут вызывать функцию, которая будет перерасчитывать
         ## цену категории, то это может сильно сократить нагрузу на БД
         ## т.к сигналы вызваются при добавлении каждого объекта.

@@ -70,11 +70,15 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             # Добавляем ключ parent если он определён
             if 'parentId' in item.keys():
                 parent = item.get('parentId')
+                ## пояснение: в дальнейшем мы будем пользоваться только parent
+                ## поэтому ключ parentId мы не удаляем
                 if parent and (parent not in ("None", "Null")):
                     item['parent'] = parent
             # Проверяем что parentID у всех итемов в запросе либо в базе,
             # либо в текущем запросе, либо отсутствует, иначе ValidationError
             if item.get('parent'):
+                if not uuid_validate(item.get('parent')):
+                    raise serializers.ValidationError
                 parent_in_db = Item.objects.filter(pk=item['parent']).first()
                 if not parent_in_db:
                     flag = False
@@ -122,13 +126,17 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     type=serializer.validated_data.get('type'),
                     parent=serializer.validated_data.get('parent'),
                 ))
+                self.perform_create(serializer.save(parent=item.get('parent')))
                 request_list.remove(item)
+                step = 0
             except:
                 step += 1
         ## очень хочется показать, что я знаю, что такое bulk_create,
         ## но он не умеет понимать когда сохранять, а когда создавать(
-        for item in temp_data:
-            item.save()
+
+        # for item in temp_data:
+        #     item.save()
+        print(temp_data)
         ## если вот тут вызывать функцию, которая будет перерасчитывать
         ## цену категории, то это может сильно сократить нагрузу на БД
         ## т.к сигналы вызваются при добавлении каждого объекта.

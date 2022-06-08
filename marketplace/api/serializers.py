@@ -18,7 +18,7 @@ class PutItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Item
-        fields = ('id', 'name', 'type', 'parent', 'date', 'price',)
+        fields = ('id', 'name', 'type', 'date', 'price',)
 
     def validate(self, data):
         # Проверяем валидность типа товара

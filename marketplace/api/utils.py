@@ -89,8 +89,6 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
             while step < len(data.get('children')):
                 item = Item.objects.filter(
                     pk=data.get('children')[step]).first()
-                if item.type == 'CATEGORY':
-                    item.price = avg_children_price(item)
                 child = self.get_serializer(item).data
                 data.get('children')[step] = child
                 self.get_all_children(child)

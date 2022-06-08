@@ -23,8 +23,6 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
-        if instance.type == 'CATEGORY':
-            instance.price = avg_children_price(instance)
         serializer = self.get_serializer(instance)
         self.get_all_children(serializer.data)
         return Response(serializer.data)
@@ -83,6 +81,8 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
         step = 0
         while len(request_list) > 0:
             try:
+                # проверяем валидность Item, контолируем поведение, если
+                # родитель находится в запросе, а не в базе данных
                 item = request_list[step]
                 current_item = Item.objects.filter(pk=item['id']).first()
                 if not current_item:
@@ -96,19 +96,15 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     method = 'PUT'
 
                 try:
+                    # Проверяем должен ли у Item быть родитель, если нет -
+                    # создаём, инчае, если родитель ещё не создан, выбрасываем
+                    # контролируемую ошибку
                     if not item.get('parent'):
                         parent = None
                     else:
                         parent = Item.objects.get(pk=item.get('parent'))
                     self.perform_create(serializer.save(parent=parent))
-                    temp_data.append(Item(
-                        id=serializer.validated_data.get('id'),
-                        name=serializer.validated_data.get('name'),
-                        price=serializer.validated_data.get('price'),
-                        date=serializer.validated_data.get('date'),
-                        type=serializer.validated_data.get('type'),
-                        parent=parent,
-                    ))
+                    temp_data.append(serializer.validated_data.get('id'))
                     request_list.remove(item)
                     step = 0
                     if method == 'PUT':
@@ -122,19 +118,19 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             except ItemNotInDBError:
                 step += 1
         ## очень хочется показать, что я знаю, что такое bulk_create,
-        ## но он не умеет понимать когда сохранять, а когда создавать(
-        print(temp_data)
-        # for item in temp_data:
-        #     item.save()
-        ## если вот тут вызывать функцию, которая будет перерасчитывать
-        ## цену категории, то это может сильно сократить нагрузу на БД
-        ## т.к сигналы вызваются при добавлении каждого объекта.
+        ## но он не умеет понимать когда сохранять, а когда создавать
+        ancestors = []
+        for item_id in temp_data:
+            item = Item.objects.get(pk=item_id)
+            if item.parent:
+                ancestors += item.get_ancestors()
+        print('\n', set(ancestors))
+        for item in ancestors:
+            item.price = avg_children_price(item)
+            item.date = request.data['updateDate']
+            item.save()
 
-        ## Как мне без сигналов понять: цены каких категорий стоит обновлять,
-        ## неужели придётся после каждого запроса полностью проходиться по
-        ## всей базе
-
-        ## я ещё не понимаю как всё это под капотом работает, но много вопросов
+        ## я не понимаю как всё это под капотом работает, но много вопросов
         ## кажется лучше обновлять цены категорий уже после отправки ответа
         ## клиенту, но не знаю как это сделать, с другой стороны, будет ли
         ## доступен сервис в то время, пока обновляются цены категорий?
@@ -150,7 +146,13 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
+        ancestors = instance.get_ancestors()
         self.perform_destroy(instance)
+        print('\n', ancestors)
+        for item in ancestors:
+            item.price = avg_children_price(item)
+            item.date = datetime.utcnow().replace(microsecond=0)
+            item.save()
         return Response(status=HTTP_200_OK)
 
 

@@ -102,34 +102,35 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                 current_item = Item.objects.filter(pk=item['id']).first()
                 if not current_item:
                     serializer = self.get_serializer(data=item)
-                    ## краевой случай:
-                    ## при запросе в котором есть и родитель и ребёнок
-                    ## у меня всегда будет validationError т.к. я не создаю
-                    ## объект в базе, а только добавляю его в temp_data
-                    ## выход вижу в том, чтобы переопределить валидацию,
-                    ## использую не только родителей в базе, но и в temp_data
-                    ## но пока не понял как
                     serializer.is_valid(raise_exception=True)
+                    method = 'POST'
                 else:
                     instance = current_item
                     serializer = self.get_serializer(instance, data=item)
-                    ## краевой случай см. выше
                     serializer.is_valid(raise_exception=True)
-                    if getattr(instance, '_prefetched_objects_cache', None):
-                        instance._prefetched_objects_cache = {}
+                    method = 'PUT'
 
-                temp_data.append(Item(
-                    id=serializer.validated_data.get('id'),
-                    name=serializer.validated_data.get('name'),
-                    price=serializer.validated_data.get('price'),
-                    date=serializer.validated_data.get('date'),
-                    type=serializer.validated_data.get('type'),
-                    parent=serializer.validated_data.get('parent'),
-                ))
                 try:
-                    self.perform_create(serializer.save(parent=item.get('parent')))
+                    if not item.get('parent'):
+                        parent = None
+                    else:
+                        parent = Item.objects.get(pk=item.get('parent'))
+                    self.perform_create(serializer.save(parent=parent))
+                    temp_data.append(Item(
+                        id=serializer.validated_data.get('id'),
+                        name=serializer.validated_data.get('name'),
+                        price=serializer.validated_data.get('price'),
+                        date=serializer.validated_data.get('date'),
+                        type=serializer.validated_data.get('type'),
+                        parent=parent,
+                    ))
                     request_list.remove(item)
                     step = 0
+                    if method == 'PUT':
+                        if getattr(
+                                instance, '_prefetched_objects_cache', None
+                        ):
+                            instance._prefetched_objects_cache = {}
                 except Exception as err:
                     print(err)
                     raise ItemNotInDBError

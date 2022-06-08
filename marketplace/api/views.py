@@ -61,25 +61,6 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             raise serializers.ValidationError
 
         for item in request.data['items']:
-            # Проверяем что parentID у всех итемов в запросе либо в базе,
-            # либо в текущем запросе, либо отсутствует, иначе ValidationError
-            if (item.get('parentId') and item.get('parentId') != "Null"
-                    and item.get('parentId') != "None"):
-                parent_in_db = Item.objects.filter(pk=item['parentId']).first()
-                if not parent_in_db:
-                    flag = False
-                    for another_item in request.data['items']:
-                        if ((another_item['id'] == item['parentId'])
-                                and (another_item['type'] == 'CATEGORY')):
-                            flag = True
-                            break
-                    if not flag:
-                        raise serializers.ValidationError
-
-        ## по условию задачи итемы идут неупорядачено, то есть мне нельзя
-        ## создавать их по очереди, нужно создавать только если нет родителя
-        ## или он уже в базе
-        for item in request.data['items']:
             item['date'] = request.data['updateDate']
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
@@ -91,19 +72,57 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                 parent = item.get('parentId')
                 if parent and (parent not in ("None", "Null")):
                     item['parent'] = parent
-            # Если объект уже существует: редактируем, иначе создаём
-            current_item = Item.objects.filter(pk=item['id']).first()
-            if not current_item:
-                serializer = self.get_serializer(data=item)
-            else:
-                instance = current_item
-                serializer = self.get_serializer(instance, data=item)
-                ## не понимаю что делают эти строчки, может их можно удалить?
-                if getattr(instance, '_prefetched_objects_cache', None):
-                    instance._prefetched_objects_cache = {}
+            # Проверяем что parentID у всех итемов в запросе либо в базе,
+            # либо в текущем запросе, либо отсутствует, иначе ValidationError
+            if item.get('parent'):
+                parent_in_db = Item.objects.filter(pk=item['parent']).first()
+                if not parent_in_db:
+                    flag = False
+                    for another_item in request.data['items']:
+                        if ((another_item['id'] == item['parent'])
+                                and (another_item['type'] == 'CATEGORY')):
+                            flag = True
+                            break
+                    if not flag:
+                        raise serializers.ValidationError
 
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
+        ## по условию задачи итемы идут неупорядачено, то есть мне нельзя
+        ## создавать их по очереди, нужно создавать только если нет родителя
+        ## или он уже в базе
+        temp_data = []
+        request_list = list(request.data['items'])
+        step = 0
+        while len(request_list) > 0:
+            try:
+                item = request_list[step]
+                current_item = Item.objects.filter(pk=item['id']).first()
+                if not current_item:
+                    serializer = self.get_serializer(data=item)
+                    ## краевой случай
+                    serializer.is_valid(raise_exception=True)
+                else:
+                    instance = current_item
+                    serializer = self.get_serializer(instance, data=item)
+                    ## краевой случай
+                    serializer.is_valid(raise_exception=True)
+                    if getattr(instance, '_prefetched_objects_cache', None):
+                        instance._prefetched_objects_cache = {}
+
+                temp_data.append(Item(
+                    id=serializer.validated_data.get('id'),
+                    name=serializer.validated_data.get('name'),
+                    price=serializer.validated_data.get('price'),
+                    date=serializer.validated_data.get('date'),
+                    type=serializer.validated_data.get('type'),
+                    parent=serializer.validated_data.get('parent'),
+                ))
+                request_list.remove(item)
+            except:
+                step += 1
+        ## очень хочется показать, что я знаю, что такое bulk_create,
+        ## но он не умеет понимать когда сохранять, а когда создавать(
+        for item in temp_data:
+            item.save()
         ## если вот тут вызывать функцию, которая будет перерасчитывать
         ## цену категории, то это может сильно сократить нагрузу на БД
         ## т.к сигналы вызваются при добавлении каждого объекта.

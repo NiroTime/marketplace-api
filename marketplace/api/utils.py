@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import re
 
@@ -8,6 +9,18 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 from .models import Item
+
+
+def validate_date(date):
+    try:
+        validated_date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S.%fZ')
+        return validated_date
+    except:
+        try:
+            validated_date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
+            return validated_date
+        except:
+            return False
 
 
 def custom_exception_handler(exc, context):

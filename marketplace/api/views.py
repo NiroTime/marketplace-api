@@ -7,7 +7,8 @@ from rest_framework.status import HTTP_200_OK
 
 from .models import Item, ItemOldVersions
 from .utils import (avg_children_price, ChangedListAPIView,
-                    uuid_validate, ItemNotInDBError, ChangedRetrieveAPIView,)
+                    uuid_validate, ItemNotInDBError, ChangedRetrieveAPIView,
+                    validate_date, )
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
                           SalesItemSerializer,)
@@ -120,11 +121,11 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
         ## очень хочется показать, что я знаю, что такое bulk_create,
         ## но он не умеет понимать когда сохранять, а когда создавать
         ancestors = []
+        # Обновляем родителей, затронутых изменениями
         for item_id in temp_data:
             item = Item.objects.get(pk=item_id)
             if item.parent:
                 ancestors += item.get_ancestors()
-        print('\n', set(ancestors))
         for item in ancestors:
             item.price = avg_children_price(item)
             item.date = request.data['updateDate']
@@ -148,7 +149,6 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         instance = self.get_object()
         ancestors = instance.get_ancestors()
         self.perform_destroy(instance)
-        print('\n', ancestors)
         for item in ancestors:
             item.price = avg_children_price(item)
             item.date = datetime.utcnow().replace(microsecond=0)
@@ -164,17 +164,9 @@ class SalesItemAPIView(ChangedListAPIView):
         end_date = self.request.query_params.get('date')
         if not end_date:
             raise serializers.ValidationError
-        ## думал воспользоваться dateutil, но не до конца понимаю, стоит ли
-        ## пытаться обработать запросы кроме этих 2х форматов?
-        ## если не пользоваться dateutil, стоит ли вынести эти 2 блока try
-        ## как функцию в utils?
-        try:
-            end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%S.%fZ')
-        except:
-            try:
-                end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%SZ')
-            except:
-                raise serializers.ValidationError
+        end_date = validate_date(end_date)
+        if not end_date:
+            raise serializers.ValidationError
         start_date = end_date - timedelta(days=1)
         queryset = Item.objects.filter(
             type='OFFER', date__range=(start_date, end_date)
@@ -191,8 +183,17 @@ class ItemStatisticAPIView(ChangedListAPIView):
             raise serializers.ValidationError
         if not uuid_validate(self.kwargs.get('pk')):
             raise serializers.ValidationError
+        start_date = self.request.query_params.get('dateStart')
+        end_date = self.request.query_params.get('dateEnd')
+        if not start_date or not end_date:
+            raise serializers.ValidationError
+        start_date = validate_date(start_date)
+        end_date = validate_date(end_date)
+        if not start_date or not end_date or (start_date > end_date):
+            raise serializers.ValidationError
         queryset = ItemOldVersions.objects.filter(
-            actual_version=str(self.kwargs.get('pk'))
+            actual_version=str(self.kwargs.get('pk')),
+            date__range=(start_date, end_date),
         )
         if not queryset:
             raise Http404

@@ -8,5 +8,5 @@ urlpatterns = [
     path('imports', PutItemAPIView.as_view()),
     path('delete/<str:pk>', DeleteItemAPIView.as_view()),
     path('sales', SalesItemAPIView.as_view()),
-    path('nodes/<str:pk>/statistic', ItemStatisticAPIView.as_view())
+    path('node/<str:pk>/statistic', ItemStatisticAPIView.as_view())
 ]

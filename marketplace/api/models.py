@@ -16,7 +16,7 @@ class Item(MPTTModel):
     )
 
     def __str__(self):
-        return self.name
+        return str(self.pk)
 
 
 class ItemOldVersions(models.Model):
@@ -86,7 +86,7 @@ def create_item_old_version(instance, **kwargs):
     exist_old_version = ItemOldVersions.objects.filter(
         actual_version=str(instance.id)
     ).first()
-    old_version = ItemOldVersions(
+    new_version = ItemOldVersions(
         actual_version=str(instance.id),
         name=instance.name,
         price=instance.price,
@@ -100,14 +100,17 @@ def create_item_old_version(instance, **kwargs):
         # в одном запросе этот объект изменяля многократно.
         if exist_old_version.date == instance.date:
             exist_old_version.price = instance.price
+            print('\n', exist_old_version, exist_old_version.date, 'refresh')
             exist_old_version.save()
             ## логика ломается, если в одном POST запросе придёт несколько
             ## обновлений одного товара, не понимаю нужно ли это архивировать
             ## как несколько изменений, или как одно
         else:
-            old_version.save()
+            print('\n', new_version, new_version.date, exist_old_version.date, 'create')
+            new_version.save()
     else:
-        old_version.save()
+        print('\n', new_version, new_version.date, 'create')
+        new_version.save()
 
 
 @receiver(post_delete, sender=Item)

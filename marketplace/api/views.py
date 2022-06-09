@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.http import Http404
+from django.utils import timezone
 from rest_framework import generics, serializers
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
@@ -34,9 +35,6 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         serializer_data['date'] = validate_date(serializer_data[
             'date'
         ]).isoformat(sep='T', timespec='milliseconds') + 'Z'
-        print(serializer.data['date'])
-        print(serializer.data)
-
         self.get_all_children(serializer_data)
         return Response(serializer_data)
 
@@ -157,7 +155,7 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         ancestors = instance.get_ancestors()
         self.perform_destroy(instance)
         for item in ancestors:
-            item.date = datetime.utcnow()
+            item.date = timezone.now()
             item.save()
         return Response(status=HTTP_200_OK)
 

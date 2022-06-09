@@ -1,6 +1,4 @@
 from django.db import models
-from django.db.models.signals import post_delete, post_save
-from django.dispatch import receiver
 from mptt.models import MPTTModel, TreeForeignKey
 
 
@@ -29,30 +27,3 @@ class ItemOldVersions(models.Model):
 
     class Meta:
         ordering = ['-date']
-
-
-@receiver(post_save, sender=Item)
-def create_item_old_version(instance, **kwargs):
-    """
-    Функция создаёт архинвую версию товара/категории, при создание/обновлении.
-    """
-    ItemOldVersions(
-        actual_version=str(instance.id),
-        name=instance.name,
-        price=instance.price,
-        date=instance.date,
-        type=instance.type,
-        parent=str(instance.parent),
-    ).save()
-    ## почему сигнал вызывается 2 раза?
-
-
-@receiver(post_delete, sender=Item)
-def delete_all_old_version_on_item_delete(instance, **kwargs):
-    """
-    Функция удаляет архивные данные, если был удалён товар/категория.
-    """
-    old_versions = ItemOldVersions.objects.filter(
-        actual_version=str(instance.id)
-    )
-    old_versions.delete()

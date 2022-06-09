@@ -1,4 +1,3 @@
-import logging
 import re
 from datetime import datetime
 
@@ -58,23 +57,22 @@ def avg_children_price(parent):
     и количество детей, возвращает среднюю стоимость или None, если
     у категории нет детей с типом OFFER.
     """
-    try:
-        children = parent.get_descendants()
-    except Exception as err:
-        logging.error(f'ошибка:{err}')
-        children = None
+    children = parent.get_descendants()
     if children:
         all_offers_price = 0
         offers_count = 0
+        last_update = parent.date
         for item in children:
             if item.type == 'OFFER':
                 all_offers_price += item.price
                 offers_count += 1
+            if item.date > last_update:
+                last_update = item.date
         try:
-            return all_offers_price // offers_count
+            return all_offers_price // offers_count, last_update
         except ZeroDivisionError:
-            return None
-    return None
+            return None, parent.date
+    return None, parent.date
 
 
 class ChangedListAPIView(generics.ListAPIView):
@@ -103,8 +101,11 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
                 item = Item.objects.filter(
                     pk=data.get('children')[step]).first()
                 if not item.price:
-                    item.price = avg_children_price(item)
+                    item.price, item.date = avg_children_price(item)
                 child = self.get_serializer(item).data
+                child['date'] = validate_date(
+                    child['date']
+                ).isoformat(sep='T', timespec='milliseconds') + 'Z'
                 data.get('children')[step] = child
                 self.get_all_children(child)
                 step += 1

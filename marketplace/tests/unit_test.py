@@ -52,12 +52,6 @@ IMPORT_BATCHES = [
     {
         "items": [
             {
-                "type": "CATEGORY",
-                "name": "Телевизоры",
-                "id": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
-            },
-            {
                 "type": "OFFER",
                 "name": "Samson 70\" LED UHD Smart",
                 "id": "98883e8f-0507-482f-bce2-2fb306cf6483",
@@ -70,6 +64,12 @@ IMPORT_BATCHES = [
                 "id": "74b81fda-9cdc-4b63-8927-c978afed5cf4",
                 "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
                 "price": 49999
+            },
+            {
+                "type": "CATEGORY",
+                "name": "Телевизоры",
+                "id": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
             }
         ],
         "updateDate": "2022-02-03T12:00:00.000Z"

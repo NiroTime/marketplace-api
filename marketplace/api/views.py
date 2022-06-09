@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.http import Http404
 from rest_framework import generics, serializers
@@ -9,6 +9,7 @@ from .models import Item, ItemOldVersions
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
                           SalesItemSerializer)
+from .signals import create_item_old_version
 from .utils import (ChangedListAPIView, ChangedRetrieveAPIView,
                     ItemNotInDBError, avg_children_price, uuid_validate,
                     validate_date)
@@ -27,21 +28,23 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         if not instance.children:
             instance.children = None
         if not instance.price:
-            instance.price = avg_children_price(instance)
-        print(instance.date)
+            instance.price, instance.date = avg_children_price(instance)
         serializer = self.get_serializer(instance)
-        self.get_all_children(serializer.data)
-        print(serializer.data.get('date'))
-        return Response(serializer.data)
+        serializer_data = serializer.data
+        serializer_data['date'] = validate_date(serializer_data[
+            'date'
+        ]).isoformat(sep='T', timespec='milliseconds') + 'Z'
+        print(serializer.data['date'])
+        print(serializer.data)
+
+        self.get_all_children(serializer_data)
+        return Response(serializer_data)
 
 
 class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
     http_method_names = ['post']
     queryset = Item.objects.all()
     serializer_class = PutItemSerializer
-    ## ощущение, что в тз хотят ограничение именно на количество иметов=1000
-    ## а у меня количество запросов=1000, не разобрался пока как расширять
-    ## throttle функционал
     throttle_scope = 'uploads'
 
     def create(self, request, *args, **kwargs):
@@ -53,16 +56,19 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
         for item in request.data['items']:
             if not validate_date(request.data['updateDate']):
                 raise serializers.ValidationError
-            item['date'] = validate_date(request.data['updateDate'])
+            try:
+                item['date'] = request.data['updateDate']
+            except:
+                raise serializers.ValidationError
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
                 price = item.get('price')
-                if (not price) or (price == "None") or (price == "Null"):
+                if not price:
                     item.pop('price')
             # Добавляем ключ parent если он определён
             if 'parentId' in item.keys():
                 parent = item.get('parentId')
-                if parent and (parent not in ("None", "Null")):
+                if parent:
                     item['parent'] = parent
             # Проверяем что parentID у всех итемов в запросе либо в базе,
             # либо в текущем запросе, либо отсутствует, иначе ValidationError
@@ -84,14 +90,6 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
         step = 0
         temp_data = []
         while len(request_list) > 0:
-            ## нашёл критическую ошибку в моём подходе:
-            ## если хоть один item из списка будет невалиден,
-            ## и он будет не первым в списке на создание,
-            ## то у меня часть объектов создатся, а чать нет.
-            ## прихожу к выводу, что нужно делать полную валидацию всех
-            ## полей каждого объекта, перед тем как отправить их в цикл
-            ## создания, но если я руками пишу валидацию, зачем мне вообще
-            ## сериалайзеры...
             try:
                 # проверяем валидность Item, контолируем поведение, если
                 # родитель находится в запросе, а не в базе данных
@@ -115,7 +113,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                         parent = None
                     else:
                         parent = Item.objects.get(pk=item.get('parent'))
-                    self.perform_create(serializer, parent, item['date'])
+                    self.perform_create(serializer, parent)
                     temp_data.append(serializer.validated_data.get('id'))
                     request_list.remove(item)
                     step = 0
@@ -133,10 +131,18 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     item = Item.objects.get(pk=item_id)
                     item.delete()
 
+        # Созаём архивные версии категорий, затронутых текущим запросом
+        ancestors = []
+        for item_id in temp_data:
+            item = Item.objects.filter(pk=item_id)
+            ancestors += item.get_ancestors()
+        for item in set(ancestors):
+            create_item_old_version(instance=item)
+
         return Response(status=HTTP_200_OK)
 
-    def perform_create(self, serializer, parent, date):
-        serializer.save(parent=parent, date=date)
+    def perform_create(self, serializer, parent):
+        serializer.save(parent=parent)
 
 
 class DeleteItemAPIView(generics.DestroyAPIView):
@@ -148,11 +154,15 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
+        ancestors = instance.get_ancestors()
         self.perform_destroy(instance)
+        for item in ancestors:
+            item.date = datetime.utcnow()
         return Response(status=HTTP_200_OK)
 
 
 class SalesItemAPIView(ChangedListAPIView):
+    http_method_names = ['get']
     serializer_class = SalesItemSerializer
     throttle_scope = 'contacts'
 
@@ -173,6 +183,7 @@ class SalesItemAPIView(ChangedListAPIView):
 
 
 class ItemStatisticAPIView(ChangedListAPIView):
+    http_method_names = ['get']
     serializer_class = ItemStatisticSerializer
     throttle_scope = 'contacts'
 

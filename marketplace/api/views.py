@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.http import Http404
 from rest_framework import generics, serializers
@@ -6,12 +6,12 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
 from .models import Item, ItemOldVersions
-from .utils import (avg_children_price, ChangedListAPIView,
-                    uuid_validate, ItemNotInDBError, ChangedRetrieveAPIView,
-                    validate_date, )
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
-                          SalesItemSerializer,)
+                          SalesItemSerializer)
+from .utils import (ChangedListAPIView, ChangedRetrieveAPIView,
+                    ItemNotInDBError, avg_children_price, uuid_validate,
+                    validate_date)
 
 
 class GetItemAPIView(ChangedRetrieveAPIView):
@@ -26,8 +26,12 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         instance = self.get_object()
         if not instance.children:
             instance.children = None
+        if not instance.price:
+            instance.price = avg_children_price(instance)
+        print(instance.date)
         serializer = self.get_serializer(instance)
         self.get_all_children(serializer.data)
+        print(serializer.data.get('date'))
         return Response(serializer.data)
 
 
@@ -49,9 +53,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
         for item in request.data['items']:
             if not validate_date(request.data['updateDate']):
                 raise serializers.ValidationError
-            item['date'] = validate_date(request.data['updateDate']).isoformat(
-                sep=' ', timespec='milliseconds'
-            )
+            item['date'] = validate_date(request.data['updateDate'])
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
                 price = item.get('price')
@@ -79,7 +81,6 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                         raise serializers.ValidationError
 
         request_list = list(request.data['items'])
-        temp_data = []
         step = 0
         while len(request_list) > 0:
             ## нашёл критическую ошибку в моём подходе:
@@ -116,7 +117,6 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     self.perform_create(
                         serializer.save(parent=parent, date=item['date'])
                     )
-                    temp_data.append(serializer.validated_data.get('id'))
                     request_list.remove(item)
                     step = 0
                     if method == 'PUT':
@@ -128,22 +128,6 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     raise ItemNotInDBError
             except ItemNotInDBError:
                 step += 1
-
-        ancestors = []
-        # Обновляем родителей, затронутых изменениями
-        for item_id in temp_data:
-            item = Item.objects.get(pk=item_id)
-            if item.parent:
-                ancestors += item.get_ancestors()
-        for item in ancestors:
-            item.price = avg_children_price(item)
-            item.date = request.data['updateDate']
-            item.save()
-
-        ## я не понимаю как всё это под капотом работает, но много вопросов
-        ## кажется лучше обновлять цены категорий уже после отправки ответа
-        ## клиенту, но не знаю как это сделать, с другой стороны, будет ли
-        ## доступен сервис в то время, пока обновляются цены категорий?
         return Response(status=HTTP_200_OK)
 
 
@@ -156,14 +140,7 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
-        ancestors = instance.get_ancestors()
         self.perform_destroy(instance)
-        for item in ancestors:
-            item.price = avg_children_price(item)
-            item.date = datetime.utcnow().replace(
-                microsecond=0
-            ).isoformat(sep=' ', timespec='milliseconds')
-            item.save()
         return Response(status=HTTP_200_OK)
 
 

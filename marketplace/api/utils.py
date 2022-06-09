@@ -1,6 +1,6 @@
-from datetime import datetime
 import logging
 import re
+from datetime import datetime
 
 from django.http import Http404
 from rest_framework import generics
@@ -102,12 +102,15 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
             while step < len(data.get('children')):
                 item = Item.objects.filter(
                     pk=data.get('children')[step]).first()
+                if not item.price:
+                    item.price = avg_children_price(item)
                 child = self.get_serializer(item).data
                 data.get('children')[step] = child
                 self.get_all_children(child)
                 step += 1
         else:
             data['children'] = None
+
 
 class ItemNotInDBError(Exception):
     pass

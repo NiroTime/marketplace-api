@@ -1,4 +1,3 @@
-from datetime import datetime
 from django.db import models
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -46,6 +45,7 @@ def create_item_old_version(instance, **kwargs):
         parent=str(instance.parent),
     ).save()
     ## почему сигнал вызывается 2 раза?
+
 
 @receiver(post_delete, sender=Item)
 def delete_all_old_version_on_item_delete(instance, **kwargs):

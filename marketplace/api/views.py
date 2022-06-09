@@ -82,6 +82,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
 
         request_list = list(request.data['items'])
         step = 0
+        temp_data = []
         while len(request_list) > 0:
             ## нашёл критическую ошибку в моём подходе:
             ## если хоть один item из списка будет невалиден,
@@ -114,9 +115,8 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                         parent = None
                     else:
                         parent = Item.objects.get(pk=item.get('parent'))
-                    self.perform_create(
-                        serializer.save(parent=parent, date=item['date'])
-                    )
+                    self.perform_create(serializer, parent, item['date'])
+                    temp_data.append(serializer.validated_data.get('id'))
                     request_list.remove(item)
                     step = 0
                     if method == 'PUT':
@@ -128,7 +128,15 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                     raise ItemNotInDBError
             except ItemNotInDBError:
                 step += 1
+            except Exception:
+                for item_id in temp_data:
+                    item = Item.objects.get(pk=item_id)
+                    item.delete()
+
         return Response(status=HTTP_200_OK)
+
+    def perform_create(self, serializer, parent, date):
+        serializer.save(parent=parent, date=date)
 
 
 class DeleteItemAPIView(generics.DestroyAPIView):

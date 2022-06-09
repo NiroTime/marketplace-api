@@ -49,7 +49,9 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
         for item in request.data['items']:
             if not validate_date(request.data['updateDate']):
                 raise serializers.ValidationError
-            item['date'] = validate_date(request.data['updateDate'])
+            item['date'] = validate_date(request.data['updateDate']).isoformat(
+                sep=' ', timespec='milliseconds'
+            )
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
                 price = item.get('price')
@@ -122,8 +124,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                                 instance, '_prefetched_objects_cache', None
                         ):
                             instance._prefetched_objects_cache = {}
-                except Exception as err:
-                    print(err)
+                except Exception:
                     raise ItemNotInDBError
             except ItemNotInDBError:
                 step += 1
@@ -155,13 +156,13 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
-        print(type(instance))
         ancestors = instance.get_ancestors()
         self.perform_destroy(instance)
-        print(ancestors)
         for item in ancestors:
             item.price = avg_children_price(item)
-            item.date = datetime.utcnow()
+            item.date = datetime.utcnow().replace(
+                microsecond=0
+            ).isoformat(sep=' ', timespec='milliseconds')
             item.save()
         return Response(status=HTTP_200_OK)
 

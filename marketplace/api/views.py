@@ -158,6 +158,7 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         self.perform_destroy(instance)
         for item in ancestors:
             item.date = datetime.utcnow()
+            item.save()
         return Response(status=HTTP_200_OK)
 
 

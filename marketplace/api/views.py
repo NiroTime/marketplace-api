@@ -6,11 +6,11 @@ from rest_framework import generics, serializers
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 
-from .models import Item, ItemOldVersions
+from .models import Item, ItemArchiveVersions
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
                           SalesItemSerializer)
-from .signals import create_item_old_version
+from .signals import create_item_archive_version
 from .utils import (ChangedListAPIView, ChangedRetrieveAPIView,
                     ItemNotInDBError, avg_children_price, uuid_validate,
                     validate_date)
@@ -135,7 +135,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             item = Item.objects.filter(pk=item_id)
             ancestors += item.get_ancestors()
         for item in set(ancestors):
-            create_item_old_version(instance=item)
+            create_item_archive_version(instance=item)
 
         return Response(status=HTTP_200_OK)
 
@@ -199,7 +199,7 @@ class ItemStatisticAPIView(ChangedListAPIView):
         end_date = validate_date(end_date)
         if not start_date or not end_date or (start_date > end_date):
             raise serializers.ValidationError
-        queryset = ItemOldVersions.objects.filter(
+        queryset = ItemArchiveVersions.objects.filter(
             actual_version=str(self.kwargs.get('pk')),
             date__range=(start_date, end_date),
         )

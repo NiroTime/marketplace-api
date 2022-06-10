@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 
-from .models import Item, ItemOldVersions
+from .models import Item, ItemArchiveVersions
 
 
 class GetItemSerializer(serializers.ModelSerializer):
@@ -26,7 +26,8 @@ class PutItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError
         if (data['type'] == 'CATEGORY') and (data.get('price')):
             raise serializers.ValidationError
-        if (data['type'] == 'OFFER') and not (data.get('price')):
+        if (data['type'] == 'OFFER') and (
+                not data.get('price') or int(data.get('price'))) < 0:
             raise serializers.ValidationError
 
         # проверяем что parentId ссылается на категорию
@@ -60,5 +61,5 @@ class ItemStatisticSerializer(serializers.ModelSerializer):
     id = serializers.CharField(source='actual_version')
 
     class Meta:
-        model = ItemOldVersions
+        model = ItemArchiveVersions
         fields = ('id', 'name', 'type', 'parent', 'date', 'price',)

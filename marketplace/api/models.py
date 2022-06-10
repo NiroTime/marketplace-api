@@ -17,7 +17,7 @@ class Item(MPTTModel):
         return str(self.pk)
 
 
-class ItemOldVersions(models.Model):
+class ItemArchiveVersions(models.Model):
     actual_version = models.CharField(max_length=36)
     name = models.CharField(max_length=300)
     price = models.IntegerField(null=True, blank=True, default=None)

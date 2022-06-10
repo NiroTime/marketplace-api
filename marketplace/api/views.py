@@ -32,9 +32,9 @@ class GetItemAPIView(ChangedRetrieveAPIView):
             instance.price, instance.date = avg_children_price(instance)
         serializer = self.get_serializer(instance)
         serializer_data = serializer.data
-        serializer_data['date'] = validate_date(serializer_data[
-            'date'
-        ]).isoformat(sep='T', timespec='milliseconds') + 'Z'
+        serializer_data['date'] = validate_date(
+            serializer_data['date']
+        ).isoformat(sep='T', timespec='milliseconds') + 'Z'
         self.get_all_children(serializer_data)
         return Response(serializer_data)
 
@@ -52,22 +52,15 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             raise serializers.ValidationError
 
         for item in request.data['items']:
-            if not validate_date(request.data['updateDate']):
-                raise serializers.ValidationError
-            try:
-                item['date'] = request.data['updateDate']
-            except:
-                raise serializers.ValidationError
+            item['date'] = request.data['updateDate']
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
-                price = item.get('price')
-                if not price:
+                if not item.get('price'):
                     item.pop('price')
             # Добавляем ключ parent если он определён
             if 'parentId' in item.keys():
-                parent = item.get('parentId')
-                if parent:
-                    item['parent'] = parent
+                if item.get('parentId'):
+                    item['parent'] = item.get('parentId')
             # Проверяем что parentID у всех итемов в запросе либо в базе,
             # либо в текущем запросе, либо отсутствует, иначе ValidationError
             if item.get('parent'):
@@ -82,6 +75,9 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                             flag = True
                             break
                     if not flag:
+                        raise serializers.ValidationError
+                else:
+                    if parent_in_db.type != 'CATEGORY':
                         raise serializers.ValidationError
 
         request_list = list(request.data['items'])
@@ -128,6 +124,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                 for item_id in temp_data:
                     item = Item.objects.get(pk=item_id)
                     item.delete()
+                raise serializers.ValidationError
 
         # Созаём архивные версии категорий, затронутых текущим запросом
         ancestors = []

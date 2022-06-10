@@ -90,6 +90,63 @@ IMPORT_BATCHES = [
     }
 ]
 
+NEW_IMPORT_BATCH = [
+    {
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "Goldstar 65\" LED UHD LOL Very Smart",
+                "id": "73bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
+                "price": 69999
+            },
+            {
+                "type": "OFFER",
+                "name": "Телевизор 1",
+                "id": "59bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "price": 6999
+            },
+            {
+                "type": "OFFER",
+                "name": "Телевизор 3",
+                "id": "73bc3b36-02d1-4288-ab35-3106c9ee1c65",
+                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "price": 19999
+            },
+            {
+                "type": "OFFER",
+                "name": "Телевизор 2",
+                "id": "73bc3b36-99d1-4245-ab35-3106c9ee1c65",
+                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "price": 169999
+            },
+            {
+                "type": "OFFER",
+                "name": "Samsung 123",
+                "id": "73bc3b36-02d1-4245-ab35-3148c9ee1c65",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "price": 29999
+            },
+            {
+                "type": "OFFER",
+                "name": "jPhone 10",
+                "id": "73bc3b36-02d1-4245-ab35-3996c9ee1c65",
+                "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                "price": 39999
+            },
+            {
+                "type": "CATEGORY",
+                "name": "Samsung",
+                "id": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "price": ""
+            }
+        ],
+        "updateDate": LAST_DATE_IN_IMPORT_BATCHES
+    }
+]
+
 EXPECTED_TREE = {
     "name": "Товары",
     "type": "CATEGORY",
@@ -220,6 +277,7 @@ EXPECTED_TREE = {
         }
     ]
 }
+
 CATEGORY_ID = "22bc3b36-02d1-4245-ab35-3106c9ee1c65"
 NEW_CATEGORY_PARENT_ID = "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2"
 UPDATE_PARENT_ID_FOR_CATEGORY = [
@@ -237,64 +295,37 @@ UPDATE_PARENT_ID_FOR_CATEGORY = [
     }
 ]
 
-DELETE_OFFER_WITH_MULTIPLE_ANCESTORS = "73bc3b36-02d1-4245-ab35-3148c9ee1c65"
+EXIST_OFFER_SWAP_TO_CATEGORY = [
+    {
+        "items": [
+            {
+                "type": "CATEGORY",
+                "name": "jPhone 10",
+                "id": "73bc3b36-02d1-4245-ab35-3996c9ee1c65",
+                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65"
+            }
+        ],
+        "updateDate": "2022-04-04T00:00:00Z"
+    }
+]
 
-NEW_IMPORT_BATCH = [
+EXIST_OFFER_SWAP_PARENT_TO_OFFER = [
     {
         "items": [
             {
                 "type": "OFFER",
-                "name": "Goldstar 65\" LED UHD LOL Very Smart",
-                "id": "73bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "price": 69999
-            },
-            {
-                "type": "OFFER",
-                "name": "Телевизор 1",
-                "id": "59bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "price": 6999
-            },
-            {
-                "type": "OFFER",
-                "name": "Телевизор 3",
-                "id": "73bc3b36-02d1-4288-ab35-3106c9ee1c65",
-                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "price": 19999
-            },
-            {
-                "type": "OFFER",
-                "name": "Телевизор 2",
-                "id": "73bc3b36-99d1-4245-ab35-3106c9ee1c65",
-                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "price": 169999
-            },
-            {
-                "type": "OFFER",
-                "name": "Samsung 123",
-                "id": "73bc3b36-02d1-4245-ab35-3148c9ee1c65",
-                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-                "price": 29999
-            },
-            {
-                "type": "OFFER",
                 "name": "jPhone 10",
                 "id": "73bc3b36-02d1-4245-ab35-3996c9ee1c65",
-                "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                "parentId": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
                 "price": 39999
-            },
-            {
-                "type": "CATEGORY",
-                "name": "Samsung",
-                "id": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-                "price": ""
             }
         ],
-        "updateDate": LAST_DATE_IN_IMPORT_BATCHES
+        "updateDate": "2022-04-04T00:00:00Z"
     }
 ]
+
+DELETE_OFFER_WITH_MULTIPLE_ANCESTORS = "73bc3b36-02d1-4245-ab35-3148c9ee1c65"
+
 
 LAST_UPDATE_DATE = "2022-04-04T00:00:00Z"
 LAST_UPDATE_DATE_PLUS_ONE_MS = "2022-04-04T00:00:00.001Z"
@@ -359,7 +390,23 @@ def test_import():
     print("Test import passed.")
 
 
-def test_nodes():
+def test_offer_cant_be_parent():
+    for batch in EXIST_OFFER_SWAP_PARENT_TO_OFFER:
+        status, _ = request("/imports", method="POST", data=batch)
+
+        assert status == 400, f"Expected HTTP status code 400, got {status}"
+    print('Test offer cant be parent passed.')
+
+
+def test_cant_swap_item_type():
+    for batch in EXIST_OFFER_SWAP_TO_CATEGORY:
+        status, _ = request("/imports", method="POST", data=batch)
+
+        assert status == 400, f"Expected HTTP status code 400, got {status}"
+    print('Test cant swap item type passed.')
+
+
+def test_nodes_show_correct_context():
     status, response = request(f"/nodes/{ROOT_ID}", json_response=True)
     # print(json.dumps(response, indent=2, ensure_ascii=False))
 
@@ -372,7 +419,7 @@ def test_nodes():
         print("Response tree doesn't match expected tree.")
         sys.exit(1)
 
-    print("Test nodes passed.")
+    print("Test nodes show correct context passed.")
 
 
 def test_update_parent_id_for_item():
@@ -497,7 +544,9 @@ def test_delete():
 
 def test_all():
     test_import()
-    test_nodes()
+    test_offer_cant_be_parent()
+    test_cant_swap_item_type()
+    test_nodes_show_correct_context()
     test_update_parent_id_for_item()
     test_sales_return_correct_data()
     test_stats_show_correct_context()

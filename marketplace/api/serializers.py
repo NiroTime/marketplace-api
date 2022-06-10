@@ -1,4 +1,3 @@
-from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 
 from .models import Item, ItemArchiveVersions
@@ -29,12 +28,6 @@ class PutItemSerializer(serializers.ModelSerializer):
         if (data['type'] == 'OFFER') and (
                 not data.get('price') or int(data.get('price'))) < 0:
             raise serializers.ValidationError
-
-        # проверяем что parentId ссылается на категорию
-        if data.get('parentId'):
-            parent_item = get_object_or_404(Item, pk=data['id'])
-            if parent_item.type != 'CATEGORY':
-                raise serializers.ValidationError
 
         # Нельзя менять тип с OFFER на CATEGORY и наоборот
         current_item = Item.objects.filter(pk=data['id']).first()

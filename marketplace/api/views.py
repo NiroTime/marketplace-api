@@ -50,8 +50,9 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                 request.data.get('updateDate')
         ):
             raise serializers.ValidationError
-
+        items_id_list = []
         for item in request.data['items']:
+            items_id_list.append(item.get('id'))
             item['date'] = request.data['updateDate']
             # Удаляем атрибут price из входных данных если он не определён
             if 'price' in item.keys():
@@ -73,12 +74,14 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                         if ((another_item['id'] == item['parent'])
                                 and (another_item['type'] == 'CATEGORY')):
                             flag = True
-                            break
                     if not flag:
                         raise serializers.ValidationError
                 else:
                     if parent_in_db.type != 'CATEGORY':
                         raise serializers.ValidationError
+        # При наличии двух одинаковых ID в запросе, он считается невалидным
+        if len(items_id_list) != len(set(items_id_list)):
+            raise serializers.ValidationError
 
         request_list = list(request.data['items'])
         step = 0

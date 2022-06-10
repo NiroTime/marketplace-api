@@ -121,6 +121,7 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             except ItemNotInDBError:
                 step += 1
             except Exception:
+                # Удаляем уже созданные объекты, если встретили невалидный Item
                 for item_id in temp_data:
                     item = Item.objects.get(pk=item_id)
                     item.delete()

@@ -188,18 +188,30 @@ class ItemStatisticAPIView(ChangedListAPIView):
             raise serializers.ValidationError
         if not uuid_validate(self.kwargs.get('pk')):
             raise serializers.ValidationError
-        start_date = self.request.query_params.get('dateStart')
-        end_date = self.request.query_params.get('dateEnd')
-        if not start_date or not end_date:
+        start_date = validate_date(self.request.query_params.get('dateStart'))
+        end_date = validate_date(self.request.query_params.get('dateEnd'))
+        if start_date and end_date and start_date > end_date:
             raise serializers.ValidationError
-        start_date = validate_date(start_date)
-        end_date = validate_date(end_date)
-        if not start_date or not end_date or (start_date > end_date):
-            raise serializers.ValidationError
-        queryset = ItemArchiveVersions.objects.filter(
-            actual_version=str(self.kwargs.get('pk')),
-            date__range=(start_date, end_date),
-        )
+        if start_date and end_date:
+            queryset = ItemArchiveVersions.objects.filter(
+                actual_version=str(self.kwargs.get('pk')),
+                date__range=(start_date, end_date),
+            )
+        elif start_date:
+            queryset = ItemArchiveVersions.objects.filter(
+                actual_version=str(self.kwargs.get('pk')),
+                date__gte=start_date,
+            )
+        elif end_date:
+            queryset = ItemArchiveVersions.objects.filter(
+                actual_version=str(self.kwargs.get('pk')),
+                date__lte=end_date,
+            )
+        else:
+            queryset = ItemArchiveVersions.objects.filter(
+                actual_version=str(self.kwargs.get('pk'))
+            )
+
         if not queryset:
             raise Http404
         return queryset

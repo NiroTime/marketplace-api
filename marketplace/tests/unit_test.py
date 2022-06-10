@@ -87,60 +87,6 @@ IMPORT_BATCHES = [
             }
         ],
         "updateDate": "2022-02-03T15:00:00.000Z"
-    },
-    {
-        "items": [
-            {
-                "type": "OFFER",
-                "name": "Goldstar 65\" LED UHD LOL Very Smart",
-                "id": "73bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "price": 69999
-            },
-            {
-                "type": "OFFER",
-                "name": "Телевизор 1",
-                "id": "59bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "price": 6999
-            },
-            {
-                "type": "OFFER",
-                "name": "Телевизор 3",
-                "id": "73bc3b36-02d1-4288-ab35-3106c9ee1c65",
-                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "price": 19999
-            },
-            {
-                "type": "OFFER",
-                "name": "Телевизор 2",
-                "id": "73bc3b36-99d1-4245-ab35-3106c9ee1c65",
-                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "price": 169999
-            },
-            {
-                "type": "OFFER",
-                "name": "Samsung 123",
-                "id": "73bc3b36-02d1-4245-ab35-3148c9ee1c65",
-                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-                "price": 29999
-            },
-            {
-                "type": "OFFER",
-                "name": "jPhone 10",
-                "id": "73bc3b36-02d1-4245-ab35-3996c9ee1c65",
-                "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
-                "price": 39999
-            },
-            {
-                "type": "CATEGORY",
-                "name": "Samsung",
-                "id": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-                "price": ""
-            }
-        ],
-        "updateDate": LAST_DATE_IN_IMPORT_BATCHES
     }
 ]
 
@@ -293,7 +239,7 @@ UPDATE_PARENT_ID_FOR_CATEGORY = [
 
 DELETE_OFFER_WITH_MULTIPLE_ANCESTORS = "73bc3b36-02d1-4245-ab35-3148c9ee1c65"
 
-IMPORT_BATCH_FOR_SALES_TEST = [
+NEW_IMPORT_BATCH = [
     {
         "items": [
             {
@@ -346,9 +292,12 @@ IMPORT_BATCH_FOR_SALES_TEST = [
                 "price": ""
             }
         ],
-        "updateDate": "2022-04-03T23:59:00Z"
+        "updateDate": LAST_DATE_IN_IMPORT_BATCHES
     }
 ]
+
+LAST_UPDATE_DATE = "2022-04-04T00:00:00Z"
+LAST_UPDATE_DATE_PLUS_ONE_MS = "2022-04-04T00:00:00.001Z"
 
 
 def request(path, method="GET", data=None, json_response=False):
@@ -371,9 +320,9 @@ def request(path, method="GET", data=None, json_response=False):
             res_data = res.read().decode("utf-8")
             if json_response:
                 res_data = json.loads(res_data)
-            return (res.getcode(), res_data)
+            return res.getcode(), res_data
     except urllib.error.HTTPError as e:
-        return (e.getcode(), None)
+        return e.getcode(), None
 
 
 def deep_sort_children(node):
@@ -398,12 +347,15 @@ def print_diff(expected, response):
 
 
 def test_import():
-    for index, batch in enumerate(IMPORT_BATCHES):
-        print(f"Importing batch {index}")
+    for batch in IMPORT_BATCHES:
         status, _ = request("/imports", method="POST", data=batch)
 
         assert status == 200, f"Expected HTTP status code 200, got {status}"
 
+    for batch in NEW_IMPORT_BATCH:
+        status, _ = request("/imports", method="POST", data=batch)
+
+        assert status == 200, f"Expected HTTP status code 200, got {status}"
     print("Test import passed.")
 
 
@@ -443,37 +395,15 @@ def test_update_parent_id_for_item():
     print('Test update parent ID passed.')
 
 
-def test_parent_info_update_on_descendants_delete():
-    status, response_before_delete = request(
-        f"/nodes/{ROOT_ID}", json_response=True
-    )
-
-    status, _ = request(
-        f"/delete/{DELETE_OFFER_WITH_MULTIPLE_ANCESTORS}", method="DELETE"
-    )
-    assert status == 200, f"Expected HTTP status code 200, got {status}"
-
-    status, response_after_delete = request(
-        f"/nodes/{ROOT_ID}", json_response=True
-    )
-
-    assert response_before_delete['price'] != response_after_delete['price'], (
-        f'Ancestors price doesnt change after descendant delete'
-    )
-    assert response_before_delete['date'] != response_after_delete['date'], (
-        f'Ancestors date doesnt change after descendant delete'
-    )
-    print('Test parent info update on descendants delete passed')
-
-
 def test_sales_return_correct_data():
     params = urllib.parse.urlencode({
-        "date": "2022-04-04T00:00:00Z"
+        "date": LAST_UPDATE_DATE
     })
     status, response = request(f"/sales?{params}", json_response=True)
     assert status == 404, f"Expected HTTP status code 404, got {status}"
 
-    for batch in IMPORT_BATCH_FOR_SALES_TEST:
+    for batch in NEW_IMPORT_BATCH:
+        batch['updateDate'] = LAST_UPDATE_DATE
         status, _ = request("/imports", method="POST", data=batch)
 
     status, response = request(f"/sales?{params}", json_response=True)
@@ -482,14 +412,14 @@ def test_sales_return_correct_data():
     response_items_id = []
     for item in response['items']:
         response_items_id.append(item['id'])
-    for item in IMPORT_BATCH_FOR_SALES_TEST[0]['items']:
+    for item in NEW_IMPORT_BATCH[0]['items']:
         if item['type'] == 'OFFER':
             assert item['id'] in response_items_id
         else:
             assert item['id'] not in response_items_id
 
-    for batch in IMPORT_BATCH_FOR_SALES_TEST:
-        batch['updateDate'] = "2022-04-04T00:00:00.001Z"
+    for batch in NEW_IMPORT_BATCH:
+        batch['updateDate'] = LAST_UPDATE_DATE_PLUS_ONE_MS
         status, _ = request("/imports", method="POST", data=batch)
 
     status, response = request(f"/sales?{params}", json_response=True)
@@ -506,7 +436,25 @@ def test_stats_show_correct_context():
     status, response = request(
         f"/node/{ROOT_ID}/statistic?{params}", json_response=True)
     assert status == 200, f"Expected HTTP status code 200, got {status}"
-    expected_archive_versions = len(IMPORT_BATCHES)
+    expected_archive_versions = len(IMPORT_BATCHES) + len(
+        NEW_IMPORT_BATCH)
+    given_archive_versions = len(response['items'])
+    assert expected_archive_versions == given_archive_versions, (
+        f'Wrong count archive versions, expected: {expected_archive_versions}'
+        f', given {given_archive_versions}'
+    )
+
+    params = urllib.parse.urlencode({
+        "dateStart": FIRST_DATE_IN_IMPORT_BATCHES,
+        "dateEnd": LAST_UPDATE_DATE
+    })
+    status, response = request(
+        f"/node/{ROOT_ID}/statistic?{params}", json_response=True)
+    assert status == 200, f"Expected HTTP status code 200, got {status}"
+
+    new_import_batch_calls = 3
+    expected_archive_versions = len(IMPORT_BATCHES) + len(
+        NEW_IMPORT_BATCH) * new_import_batch_calls
     given_archive_versions = len(response['items'])
     assert expected_archive_versions == given_archive_versions, (
         f'Wrong count archive versions, expected: {expected_archive_versions}'
@@ -514,6 +462,27 @@ def test_stats_show_correct_context():
     )
 
     print("Test stats show correct context passed.")
+
+
+def test_parent_info_update_on_descendants_delete():
+    status, response_before_delete = request(
+        f"/nodes/{ROOT_ID}", json_response=True
+    )
+
+    status, _ = request(
+        f"/delete/{DELETE_OFFER_WITH_MULTIPLE_ANCESTORS}", method="DELETE"
+    )
+    assert status == 200, f"Expected HTTP status code 200, got {status}"
+    status, response_after_delete = request(
+        f"/nodes/{ROOT_ID}", json_response=True
+    )
+    assert response_before_delete['price'] != response_after_delete['price'], (
+        f'Ancestors price doesnt change after descendant delete'
+    )
+    assert response_before_delete['date'] != response_after_delete['date'], (
+        f'Ancestors date doesnt change after descendant delete'
+    )
+    print('Test parent info update on descendants delete passed')
 
 
 def test_delete():
@@ -532,6 +501,7 @@ def test_all():
     test_update_parent_id_for_item()
     test_sales_return_correct_data()
     test_stats_show_correct_context()
+    test_parent_info_update_on_descendants_delete()
     test_delete()
 
 

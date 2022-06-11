@@ -84,6 +84,14 @@ def test_cant_swap_item_type():
     print('Test cant swap item type passed.')
 
 
+def test_cant_post_offer_without_price():
+    for batch in OFFER_WITHOUT_PRICE:
+        status, _ = request("/imports", method="POST", data=batch)
+
+        assert status == 400, f"Expected HTTP status code 400, got {status}"
+    print('Test cant swap item type passed.')
+
+
 def test_nodes_show_correct_context():
     status, response = request(f"/nodes/{ROOT_ID}", json_response=True)
     # print(json.dumps(response, indent=2, ensure_ascii=False))
@@ -100,13 +108,31 @@ def test_nodes_show_correct_context():
     print("Test nodes show correct context passed.")
 
 
+def test_all_batch_decline_if_one_item_invalid():
+    for batch in NEW_IMPORT_BATCH_WITH_ONLY_ONE_INVALID_ITEM:
+        status, _ = request("/imports", method="POST", data=batch)
+
+        assert status == 400, f"Expected HTTP status code 400, got {status}"
+
+    _, response = request(f"/nodes/{ROOT_ID}", json_response=True)
+
+    deep_sort_children(response)
+    deep_sort_children(EXPECTED_TREE)
+    if response != EXPECTED_TREE:
+        print_diff(EXPECTED_TREE, response)
+        print("Response tree doesn't match expected tree.")
+        sys.exit(1)
+
+    print("Test all batch decline if one item invalid passed.")
+
+
 def test_update_parent_id_for_item():
     for batch in UPDATE_PARENT_ID_FOR_CATEGORY:
         status, _ = request("/imports", method="POST", data=batch)
 
         assert status == 200, f"Expected HTTP status code 200, got {status}"
 
-    status, response = request(
+    _, response = request(
         f"/nodes/{NEW_CATEGORY_PARENT_ID}", json_response=True
     )
     flag = False
@@ -198,7 +224,7 @@ def test_parent_info_update_on_descendants_delete():
         f"/delete/{DELETE_OFFER_WITH_MULTIPLE_ANCESTORS}", method="DELETE"
     )
     assert status == 200, f"Expected HTTP status code 200, got {status}"
-    status, response_after_delete = request(
+    _, response_after_delete = request(
         f"/nodes/{ROOT_ID}", json_response=True
     )
     assert response_before_delete['price'] != response_after_delete['price'], (
@@ -224,7 +250,9 @@ def test_all():
     test_import()
     test_offer_cant_be_parent()
     test_cant_swap_item_type()
+    test_cant_post_offer_without_price()
     test_nodes_show_correct_context()
+    test_all_batch_decline_if_one_item_invalid()
     test_update_parent_id_for_item()
     test_sales_return_correct_data()
     test_stats_show_correct_context()

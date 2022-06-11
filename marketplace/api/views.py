@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db import transaction
 from django.http import Http404
 from django.utils import timezone
 from rest_framework import generics, serializers
@@ -47,9 +48,12 @@ class PostItemAPIView(generics.CreateAPIView):
     throttle_scope = 'uploads'
 
     def create(self, request, *args, **kwargs):
-        if (not request.data.get('items')) or not (
-                request.data.get('updateDate')
-        ):
+        try:
+            if (not request.data.get('items')) or not (
+                    request.data.get('updateDate')
+            ):
+                raise serializers.ValidationError
+        except:
             raise serializers.ValidationError
         items_id_list = []
         for item in request.data['items']:
@@ -89,56 +93,55 @@ class PostItemAPIView(generics.CreateAPIView):
         request_list = list(request.data['items'])
         step = 0
         temp_data = []
-        while len(request_list) > 0:
-            try:
-                # проверяем валидность Item, контолируем поведение, если
-                # родитель находится в запросе, а не в базе данных
-                item = request_list[step]
-                current_item = Item.objects.filter(pk=item['id']).first()
-                if not current_item:
-                    serializer = self.get_serializer(data=item)
-                    serializer.is_valid(raise_exception=True)
-                    method = 'POST'
-                else:
-                    instance = current_item
-                    serializer = self.get_serializer(instance, data=item)
-                    serializer.is_valid(raise_exception=True)
-                    method = 'PUT'
-
+        with transaction.atomic():
+            sid = transaction.savepoint()
+            while len(request_list) > 0:
                 try:
-                    # Проверяем должен ли у Item быть родитель, если нет -
-                    # создаём, инчае, если родитель ещё не создан, выбрасываем
-                    # контролируемую ошибку
-                    if not item.get('parent'):
-                        parent = None
+                    # проверяем валидность Item, контолируем поведение, если
+                    # родитель находится в запросе, а не в базе данных
+                    item = request_list[step]
+                    current_item = Item.objects.filter(pk=item['id']).first()
+                    if not current_item:
+                        serializer = self.get_serializer(data=item)
+                        serializer.is_valid(raise_exception=True)
+                        method = 'POST'
                     else:
-                        parent = Item.objects.get(pk=item.get('parent'))
-                    self.perform_create(serializer, parent)
-                    temp_data.append(serializer.validated_data.get('id'))
-                    request_list.remove(item)
-                    step = 0
-                    if method == 'PUT':
-                        if getattr(
-                                instance, '_prefetched_objects_cache', None
-                        ):
-                            instance._prefetched_objects_cache = {}
+                        instance = current_item
+                        serializer = self.get_serializer(instance, data=item)
+                        serializer.is_valid(raise_exception=True)
+                        method = 'PUT'
+
+                    try:
+                        # Проверяем должен ли у Item быть родитель, если нет -
+                        # создаём, инчае, если родитель ещё не создан,
+                        # выбрасываем контролируемую ошибку
+                        if not item.get('parent'):
+                            parent = None
+                        else:
+                            parent = Item.objects.get(pk=item.get('parent'))
+                        self.perform_create(serializer, parent)
+                        temp_data.append(serializer.validated_data.get('id'))
+                        request_list.remove(item)
+                        step = 0
+                        if method == 'PUT':
+                            if getattr(
+                                    instance, '_prefetched_objects_cache', None
+                            ):
+                                instance._prefetched_objects_cache = {}
+                    except Exception:
+                        raise ItemNotInDBError
+                except ItemNotInDBError:
+                    step += 1
                 except Exception:
-                    raise ItemNotInDBError
-            except ItemNotInDBError:
-                step += 1
-            except Exception:
-                # Удаляем уже созданные объекты, если встретили невалидный Item
-                for item_id in temp_data:
-                    item = Item.objects.get(pk=item_id)
-                    item.delete()
-                raise serializers.ValidationError
+                    # Удаляем уже созданные объекты,
+                    # если встретили невалидный Item
+                    transaction.savepoint_rollback(sid)
+                    raise serializers.ValidationError
 
         # Созаём архивные версии категорий, затронутых текущим запросом
-        items_for_archiving = []
         archive_items_list = []
-        for item_id in temp_data:
-            item = Item.objects.get(pk=item_id)
-            items_for_archiving += item.get_ancestors(include_self=True)
+        items = Item.objects.filter(pk__in=temp_data)
+        items_for_archiving = items.get_ancestors(include_self=True)
         for item in set(items_for_archiving):
             archive_items_list.append(
                 create_item_archive_version(instance=item)

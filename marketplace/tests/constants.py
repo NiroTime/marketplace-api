@@ -14,6 +14,8 @@ DELETE_OFFER_WITH_MULTIPLE_ANCESTORS = "73bc3b36-02d1-4245-ab35-3148c9ee1c65"
 LAST_UPDATE_DATE = "2022-04-04T00:00:00Z"
 LAST_UPDATE_DATE_PLUS_ONE_MS = "2022-04-04T00:00:00.001Z"
 
+NONE_PRICE_FOR_OFFER = None
+
 IMPORT_BATCHES = [
     {
         "items": [
@@ -138,6 +140,63 @@ NEW_IMPORT_BATCH = [
             {
                 "type": "CATEGORY",
                 "name": "Samsung",
+                "id": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "price": ""
+            }
+        ],
+        "updateDate": "2022-02-03T16:00:00Z"
+    }
+]
+
+NEW_IMPORT_BATCH_WITH_ONLY_ONE_INVALID_ITEM = [
+    {
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "Goldstar ery Smart",
+                "id": "73bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
+                "price": 69999
+            },
+            {
+                "type": "OFFER",
+                "name": "Телевизор 1111111111111",
+                "id": "59bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "price": 6999
+            },
+            {
+                "type": "OFFER",
+                "name": "Телевизор 33333333333",
+                "id": "73bc3b36-02d1-4288-ab35-3106c9ee1c65",
+                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "price": 19999
+            },
+            {
+                "type": "OFFER",
+                "name": "Телевизор 22222222222",
+                "id": "73bc3b36-99d1-4245-ab35-3106c9ee1c65",
+                "parentId": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "price": 169999
+            },
+            {
+                "type": "OFFER",
+                "name": "Samsung 1233333333",
+                "id": DELETE_OFFER_WITH_MULTIPLE_ANCESTORS,
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "price": 29999
+            },
+            {
+                "type": "OFFER",
+                "name": "jPhone 103333333333",
+                "id": "73bc3b36-02d1-4245-ab35-3996c9ee1c65",
+                "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                "price": NONE_PRICE_FOR_OFFER
+            },
+            {
+                "type": "CATEGORY",
+                "name": "Samsung22222",
                 "id": "22bc3b36-02d1-4245-ab35-3106c9ee1c65",
                 "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
                 "price": ""
@@ -316,6 +375,21 @@ EXIST_OFFER_SWAP_PARENT_TO_OFFER = [
                 "id": "73bc3b36-02d1-4245-ab35-3996c9ee1c65",
                 "parentId": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
                 "price": 39999
+            }
+        ],
+        "updateDate": "2022-04-04T00:00:00Z"
+    }
+]
+
+OFFER_WITHOUT_PRICE = [
+    {
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "jPhone 5",
+                "id": "73bc3b36-02d1-4245-ab35-3336c9ee1c65",
+                "parentId": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
+                "price": None
             }
         ],
         "updateDate": "2022-04-04T00:00:00Z"

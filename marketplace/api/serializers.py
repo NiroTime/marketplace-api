@@ -25,8 +25,8 @@ class PutItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError
         if (data['type'] == 'CATEGORY') and (data.get('price')):
             raise serializers.ValidationError
-        if (data['type'] == 'OFFER') and (
-                not data.get('price') or int(data.get('price'))) < 0:
+        if (data['type'] == 'OFFER') and (not data.get('price') or int(
+                data.get('price')) < 0):
             raise serializers.ValidationError
 
         # Нельзя менять тип с OFFER на CATEGORY и наоборот

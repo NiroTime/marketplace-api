@@ -10,10 +10,9 @@ from .models import Item, ItemArchiveVersions
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
                           SalesItemSerializer)
-from .signals import create_item_archive_version
 from .utils import (ChangedListAPIView, ChangedRetrieveAPIView,
-                    ItemNotInDBError, avg_children_price, uuid_validate,
-                    validate_date)
+                    ItemNotInDBError, avg_children_price_and_date,
+                    uuid_validate, validate_date, create_item_archive_version)
 
 
 class GetItemAPIView(ChangedRetrieveAPIView):
@@ -29,7 +28,9 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         if not instance.children:
             instance.children = None
         if not instance.price:
-            instance.price, instance.date = avg_children_price(instance)
+            instance.price, instance.date = avg_children_price_and_date(
+                instance
+            )
         serializer = self.get_serializer(instance)
         serializer_data = serializer.data
         serializer_data['date'] = validate_date(
@@ -39,7 +40,7 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         return Response(serializer_data)
 
 
-class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
+class PostItemAPIView(generics.CreateAPIView):
     http_method_names = ['post']
     queryset = Item.objects.all()
     serializer_class = PutItemSerializer
@@ -55,30 +56,32 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
             items_id_list.append(item.get('id'))
             item['date'] = request.data['updateDate']
             # Удаляем атрибут price из входных данных если он не определён
-            if 'price' in item.keys():
-                if not item.get('price'):
-                    item.pop('price')
+            if 'price' in item.keys() and not item.get('price'):
+                item.pop('price')
             # Добавляем ключ parent если он определён
-            if 'parentId' in item.keys():
-                if item.get('parentId'):
-                    item['parent'] = item.get('parentId')
+            if 'parentId' in item.keys() and item.get('parentId'):
+                item['parent'] = item.get('parentId')
             # Проверяем что parentID у всех итемов в запросе либо в базе,
             # либо в текущем запросе, либо отсутствует, иначе ValidationError
             if item.get('parent'):
-                if not uuid_validate(item.get('parent')):
+                if not uuid_validate(item.get('parent')) or (
+                        item.get('id') == item.get('parent')):
                     raise serializers.ValidationError
-                parent_in_db = Item.objects.filter(pk=item['parent']).first()
+                else:
+                    parent_in_db = Item.objects.filter(
+                        pk=item['parent']
+                    ).first()
                 if not parent_in_db:
                     flag = False
                     for another_item in request.data['items']:
                         if ((another_item['id'] == item['parent'])
                                 and (another_item['type'] == 'CATEGORY')):
                             flag = True
+                            break
                     if not flag:
                         raise serializers.ValidationError
-                else:
-                    if parent_in_db.type != 'CATEGORY':
-                        raise serializers.ValidationError
+                elif parent_in_db.type != 'CATEGORY':
+                    raise serializers.ValidationError
         # При наличии двух одинаковых ID в запросе, он считается невалидным
         if len(items_id_list) != len(set(items_id_list)):
             raise serializers.ValidationError
@@ -131,13 +134,16 @@ class PutItemAPIView(generics.CreateAPIView, generics.UpdateAPIView):
                 raise serializers.ValidationError
 
         # Созаём архивные версии категорий, затронутых текущим запросом
-        ancestors = []
+        items_for_archiving = []
+        archive_items_list = []
         for item_id in temp_data:
-            item = Item.objects.filter(pk=item_id)
-            ancestors += item.get_ancestors()
-        for item in set(ancestors):
-            create_item_archive_version(instance=item)
-
+            item = Item.objects.get(pk=item_id)
+            items_for_archiving += item.get_ancestors(include_self=True)
+        for item in set(items_for_archiving):
+            archive_items_list.append(
+                create_item_archive_version(instance=item)
+            )
+        ItemArchiveVersions.objects.bulk_create(archive_items_list)
         return Response(status=HTTP_200_OK)
 
     def perform_create(self, serializer, parent):
@@ -158,6 +164,7 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         for item in ancestors:
             item.date = timezone.now()
             item.save()
+            create_item_archive_version(item).save()
         return Response(status=HTTP_200_OK)
 
 

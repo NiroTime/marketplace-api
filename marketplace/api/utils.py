@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
-from .models import Item
+from .models import Item, ItemArchiveVersions
 
 
 def validate_date(date):
@@ -51,7 +51,7 @@ def uuid_validate(string):
     return True
 
 
-def avg_children_price(parent):
+def avg_children_price_and_date(parent):
     """
     Функция принимает на вход родителя, считает среднюю стоимость категории,
     а так же ищет последнюю дату обновления, возвращает среднюю стоимость
@@ -74,6 +74,27 @@ def avg_children_price(parent):
         except ZeroDivisionError:
             return None, parent.date
     return None, parent.date
+
+
+def create_item_archive_version(instance):
+    """
+    Функция создаёт архинвую версию товара/категории.
+    """
+    fresh_archive_version = ItemArchiveVersions(
+        actual_version=str(instance.id),
+        name=instance.name,
+        price=instance.price,
+        date=instance.date,
+        type=instance.type,
+        parent=str(instance.parent),
+    )
+    if instance.type == 'CATEGORY':
+        fresh_archive_version.price, date = avg_children_price_and_date(
+            instance
+        )
+        if fresh_archive_version.date < date:
+            fresh_archive_version.date = date
+    return fresh_archive_version
 
 
 class ChangedListAPIView(generics.ListAPIView):
@@ -102,7 +123,7 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
                 item = Item.objects.filter(
                     pk=data.get('children')[step]).first()
                 if not item.price:
-                    item.price, item.date = avg_children_price(item)
+                    item.price, item.date = avg_children_price_and_date(item)
                 child = self.get_serializer(item).data
                 child['date'] = validate_date(
                     child['date']

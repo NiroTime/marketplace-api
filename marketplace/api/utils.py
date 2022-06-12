@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 
 from django.http import Http404
-from rest_framework import generics
+from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
@@ -82,12 +82,12 @@ def request_data_validate(request_data):
     """
     Функция нормализует данные полученные из Request.data, и проверяет, что
     родитель каждого Item находится либо в БД, либо в текущем запросе,
-    функция возвращает стисок нормализованных Items, либо False.
+    функция возвращает список нормализованных Items.
     """
     if (not request_data.get('items')) or not (request_data.get('updateDate')):
-        return False
+        raise serializers.ValidationError
     items_id_list = []
-    items_parent_id_list = []
+    items_parent_id_set = set()
     for item in request_data['items']:
         items_id_list.append(item.get('id'))
         item['date'] = request_data['updateDate']
@@ -102,21 +102,24 @@ def request_data_validate(request_data):
         if item.get('parent'):
             if not uuid_validate(item.get('parent')) or (
                     item.get('id') == item.get('parent')):
-                return False
-            items_parent_id_list.append(item.get('parent'))
+                raise serializers.ValidationError
+            items_parent_id_set.add(item.get('parent'))
 
-    if len(items_id_list) != len(set(items_id_list)):
-        return False
+    items_id_set = set(items_id_list)
+    if len(items_id_list) != len(items_id_set):
+        raise serializers.ValidationError
 
-    if items_parent_id_list:
+    if items_parent_id_set:
         parents_in_db = Item.objects.filter(
-            pk__in=items_parent_id_list
-        )
-        parents_in_db_id_list = [str(p) for p in parents_in_db] + items_id_list
+            pk__in=items_parent_id_set
+        ).values_list('id')
+        print(parents_in_db)
+        parents_in_db_id_set = {str(p[0]) for p in parents_in_db}
 
-        for parent_id in set(items_parent_id_list):
-            if parent_id not in parents_in_db_id_list:
-                return False
+        for parent_id in items_parent_id_set:
+            if (parent_id not in parents_in_db_id_set
+                    and parent_id not in items_id_set):
+                raise serializers.ValidationError
     return request_data['items']
 
 

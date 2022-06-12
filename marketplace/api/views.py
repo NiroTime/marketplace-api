@@ -54,8 +54,6 @@ class PostItemAPIView(generics.CreateAPIView):
         if not isinstance(request.data, dict):
             raise serializers.ValidationError
         request_list = request_data_validate(request.data)
-        if not request_list:
-            raise serializers.ValidationError
         step = 0
         temp_data = []
         with transaction.atomic():

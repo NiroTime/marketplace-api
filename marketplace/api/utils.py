@@ -11,6 +11,7 @@ from .models import Item, ItemArchiveVersions
 
 
 def validate_date(date):
+    """Функция валидирует дату, и возвращает объект datetime или False."""
     try:
         validated_date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S.%fZ')
         return validated_date
@@ -23,7 +24,7 @@ def validate_date(date):
 
 
 def custom_exception_handler(exc, context):
-    """Кастомизируем ответ клиенту в соответсвии с ТЗ."""
+    """Кастомизируем ответ клиенту."""
     if isinstance(exc, ValidationError):
         data = {
             "code": 400,
@@ -41,6 +42,7 @@ def custom_exception_handler(exc, context):
 
 
 def uuid_validate(string):
+    """Функция валидирует uuid, возвращает True или False."""
     if not (
         re.match(
             r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
@@ -76,6 +78,48 @@ def avg_children_price_and_date(parent):
     return None, parent.date
 
 
+def request_data_validate(request_data):
+    """
+    Функция нормализует данные полученные из Request.data, и проверяет, что
+    родитель каждого Item находится либо в БД, либо в текущем запросе,
+    функция возвращает стисок нормализованных Items, либо False.
+    """
+    if (not request_data.get('items')) or not (request_data.get('updateDate')):
+        return False
+    items_id_list = []
+    items_parent_id_list = []
+    for item in request_data['items']:
+        items_id_list.append(item.get('id'))
+        item['date'] = request_data['updateDate']
+        # Удаляем атрибут price из входных данных если он не определён
+        if 'price' in item.keys() and not item.get('price'):
+            item.pop('price')
+        # Добавляем ключ parent если он определён
+        if 'parentId' in item.keys() and item.get('parentId'):
+            item['parent'] = item.get('parentId')
+        # Проверяем что parentID у всех итемов в запросе либо в базе,
+        # либо в текущем запросе, либо отсутствует, иначе ValidationError
+        if item.get('parent'):
+            if not uuid_validate(item.get('parent')) or (
+                    item.get('id') == item.get('parent')):
+                return False
+            items_parent_id_list.append(item.get('parent'))
+
+    if len(items_id_list) != len(set(items_id_list)):
+        return False
+
+    if items_parent_id_list:
+        parents_in_db = Item.objects.filter(
+            pk__in=items_parent_id_list
+        )
+        parents_in_db_id_list = [str(p) for p in parents_in_db] + items_id_list
+
+        for parent_id in set(items_parent_id_list):
+            if parent_id not in parents_in_db_id_list:
+                return False
+    return request_data['items']
+
+
 def create_item_archive_version(instance):
     """
     Функция создаёт архинвую версию товара/категории.
@@ -101,18 +145,24 @@ class ChangedListAPIView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
-        return Response(data={"items": serializer.data})
+        serializer_data = serializer.data
+        for item in serializer_data:
+            item['date'] = validate_date(
+                    item['date']
+                ).isoformat(sep='T', timespec='milliseconds') + 'Z'
+        return Response(data={"items": serializer_data})
 
 
 class ChangedRetrieveAPIView(generics.RetrieveAPIView):
 
-    def get_all_children(self, data):
+    def get_all_children(self, data, descendants):
         """
         Рекурсивная функция распаковывающая детей
         у сериализованного объекта Item.
@@ -120,8 +170,7 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
         if data.get('children'):
             step = 0
             while step < len(data.get('children')):
-                item = Item.objects.filter(
-                    pk=data.get('children')[step]).first()
+                item = descendants.get(id=data.get('children')[step])
                 if not item.price:
                     item.price, item.date = avg_children_price_and_date(item)
                 child = self.get_serializer(item).data
@@ -129,7 +178,7 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
                     child['date']
                 ).isoformat(sep='T', timespec='milliseconds') + 'Z'
                 data.get('children')[step] = child
-                self.get_all_children(child)
+                self.get_all_children(child, descendants)
                 step += 1
         else:
             data['children'] = None

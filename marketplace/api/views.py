@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, serializers
 from rest_framework.response import Response
@@ -13,7 +14,8 @@ from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           SalesItemSerializer)
 from .utils import (ChangedListAPIView, ChangedRetrieveAPIView,
                     ItemNotInDBError, avg_children_price_and_date,
-                    uuid_validate, validate_date, create_item_archive_version)
+                    uuid_validate, validate_date, create_item_archive_version,
+                    request_data_validate, )
 
 
 class GetItemAPIView(ChangedRetrieveAPIView):
@@ -26,6 +28,7 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
+        descendants = instance.get_descendants()
         if not instance.children:
             instance.children = None
         if not instance.price:
@@ -37,7 +40,7 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         serializer_data['date'] = validate_date(
             serializer_data['date']
         ).isoformat(sep='T', timespec='milliseconds') + 'Z'
-        self.get_all_children(serializer_data)
+        self.get_all_children(serializer_data, descendants)
         return Response(serializer_data)
 
 
@@ -48,53 +51,14 @@ class PostItemAPIView(generics.CreateAPIView):
     throttle_scope = 'uploads'
 
     def create(self, request, *args, **kwargs):
-        try:
-            if (not request.data.get('items')) or not (
-                    request.data.get('updateDate')
-            ):
-                raise serializers.ValidationError
-        except:
+        if not isinstance(request.data, dict):
             raise serializers.ValidationError
-        items_id_list = []
-        for item in request.data['items']:
-            items_id_list.append(item.get('id'))
-            item['date'] = request.data['updateDate']
-            # Удаляем атрибут price из входных данных если он не определён
-            if 'price' in item.keys() and not item.get('price'):
-                item.pop('price')
-            # Добавляем ключ parent если он определён
-            if 'parentId' in item.keys() and item.get('parentId'):
-                item['parent'] = item.get('parentId')
-            # Проверяем что parentID у всех итемов в запросе либо в базе,
-            # либо в текущем запросе, либо отсутствует, иначе ValidationError
-            if item.get('parent'):
-                if not uuid_validate(item.get('parent')) or (
-                        item.get('id') == item.get('parent')):
-                    raise serializers.ValidationError
-                else:
-                    parent_in_db = Item.objects.filter(
-                        pk=item['parent']
-                    ).first()
-                if not parent_in_db:
-                    flag = False
-                    for another_item in request.data['items']:
-                        if ((another_item['id'] == item['parent'])
-                                and (another_item['type'] == 'CATEGORY')):
-                            flag = True
-                            break
-                    if not flag:
-                        raise serializers.ValidationError
-                elif parent_in_db.type != 'CATEGORY':
-                    raise serializers.ValidationError
-        # При наличии двух одинаковых ID в запросе, он считается невалидным
-        if len(items_id_list) != len(set(items_id_list)):
+        request_list = request_data_validate(request.data)
+        if not request_list:
             raise serializers.ValidationError
-
-        request_list = list(request.data['items'])
         step = 0
         temp_data = []
         with transaction.atomic():
-            sid = transaction.savepoint()
             while len(request_list) > 0:
                 try:
                     # проверяем валидность Item, контолируем поведение, если
@@ -118,7 +82,12 @@ class PostItemAPIView(generics.CreateAPIView):
                         if not item.get('parent'):
                             parent = None
                         else:
-                            parent = Item.objects.get(pk=item.get('parent'))
+                            parent = get_object_or_404(
+                                Item,
+                                pk=item.get('parent')
+                            )
+                            if parent.type != 'CATEGORY':
+                                raise serializers.ValidationError
                         self.perform_create(serializer, parent)
                         temp_data.append(serializer.validated_data.get('id'))
                         request_list.remove(item)
@@ -128,14 +97,11 @@ class PostItemAPIView(generics.CreateAPIView):
                                     instance, '_prefetched_objects_cache', None
                             ):
                                 instance._prefetched_objects_cache = {}
-                    except Exception:
+                    except Http404:
                         raise ItemNotInDBError
                 except ItemNotInDBError:
                     step += 1
                 except Exception:
-                    # Удаляем уже созданные объекты,
-                    # если встретили невалидный Item
-                    transaction.savepoint_rollback(sid)
                     raise serializers.ValidationError
 
         # Созаём архивные версии категорий, затронутых текущим запросом

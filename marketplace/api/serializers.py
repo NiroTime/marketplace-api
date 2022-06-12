@@ -31,9 +31,8 @@ class PutItemSerializer(serializers.ModelSerializer):
 
         # Нельзя менять тип с OFFER на CATEGORY и наоборот
         current_item = Item.objects.filter(pk=data['id']).first()
-        if current_item:
-            if current_item.type != data['type']:
-                raise serializers.ValidationError
+        if current_item and current_item.type != data['type']:
+            raise serializers.ValidationError
         return data
 
 

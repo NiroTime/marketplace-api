@@ -89,7 +89,7 @@ def test_cant_post_offer_without_price():
         status, _ = request("/imports", method="POST", data=batch)
 
         assert status == 400, f"Expected HTTP status code 400, got {status}"
-    print('Test cant swap item type passed.')
+    print('Test cant post offer without price passed.')
 
 
 def test_nodes_show_correct_context():
@@ -108,7 +108,7 @@ def test_nodes_show_correct_context():
     print("Test nodes show correct context passed.")
 
 
-def test_all_batch_decline_if_one_item_invalid():
+def test_all_items_in_batch_decline_if_one_item_invalid():
     for batch in NEW_IMPORT_BATCH_WITH_ONLY_ONE_INVALID_ITEM:
         status, _ = request("/imports", method="POST", data=batch)
 
@@ -123,7 +123,7 @@ def test_all_batch_decline_if_one_item_invalid():
         print("Response tree doesn't match expected tree.")
         sys.exit(1)
 
-    print("Test all batch decline if one item invalid passed.")
+    print("Test all items in batch decline if one item invalid passed.")
 
 
 def test_update_parent_id_for_item():
@@ -252,7 +252,7 @@ def test_all():
     test_cant_swap_item_type()
     test_cant_post_offer_without_price()
     test_nodes_show_correct_context()
-    test_all_batch_decline_if_one_item_invalid()
+    test_all_items_in_batch_decline_if_one_item_invalid()
     test_update_parent_id_for_item()
     test_sales_return_correct_data()
     test_stats_show_correct_context()

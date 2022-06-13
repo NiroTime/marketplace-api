@@ -131,3 +131,6 @@ dmypy.json
 /info/
 /marketplace/tests/expected.json
 /marketplace/tests/response.json
+/marketplace/static/admin/
+/marketplace/static/mptt/
+/marketplace/static/rest_framework/

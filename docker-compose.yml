@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  web:
+    build: ./marketplace
+    restart: always
+    command: python manage.py runserver 0.0.0.0:8080
+    volumes:
+      - static_volume:/home/app/web/static
+    ports:
+      - 80:8080
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+  db:
+    image: postgres:12.0-alpine
+    restart: always
+    volumes:
+      - postgres_volume:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=django_user
+      - POSTGRES_PASSWORD=django_password
+      - POSTGRES_DB=django_db
+
+volumes:
+  postgres_volume:
+  static_volume:

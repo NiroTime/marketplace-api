@@ -4,9 +4,7 @@ services:
   web:
     build: ./marketplace
     restart: always
-    command: python manage.py runserver 0.0.0.0:8080
-    volumes:
-      - static_volume:/home/app/web/static
+    command: gunicorn marketplace.wsgi:application --bind 0.0.0.0:8080
     ports:
       - 80:8080
     env_file:
@@ -25,4 +23,3 @@ services:
 
 volumes:
   postgres_volume:
-  static_volume:

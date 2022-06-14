@@ -105,10 +105,12 @@ def request_data_validate(request_data):
                 raise serializers.ValidationError
             items_parent_id_set.add(item.get('parent'))
 
+    # В запросе не должно быть Items с одинаковым id
     items_id_set = set(items_id_list)
     if len(items_id_list) != len(items_id_set):
         raise serializers.ValidationError
 
+    # Убедимся, что родители всех Items находятся либо в БД, либо в запросе
     if items_parent_id_set:
         parents_in_db = Item.objects.filter(
             pk__in=items_parent_id_set

@@ -29,7 +29,7 @@ class GetItemAPIView(ChangedRetrieveAPIView):
             raise serializers.ValidationError
         instance = self.get_object()
         descendants = instance.get_descendants()
-        if not instance.children:
+        if instance.type == 'OFFER':
             instance.children = None
         if not instance.price:
             instance.price, instance.date = avg_children_price_and_date(

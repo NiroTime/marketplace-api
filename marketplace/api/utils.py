@@ -185,7 +185,7 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
                 data.get('children')[step] = child
                 self.get_all_children(child, descendants)
                 step += 1
-        else:
+        elif data['type'] == 'OFFER':
             data['children'] = None
 
 

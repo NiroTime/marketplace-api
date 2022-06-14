@@ -4,9 +4,9 @@ services:
   web:
     build: ./marketplace
     restart: always
-    command: gunicorn marketplace.wsgi:application --bind 0.0.0.0:8080
+    command: gunicorn marketplace.wsgi:application --bind 0.0.0.0:8000
     ports:
-      - 80:8080
+      - 80:8000
     env_file:
       - ./.env
     depends_on:

@@ -4,8 +4,8 @@ from mptt.models import MPTTModel, TreeForeignKey
 
 class Item(MPTTModel):
     id = models.UUIDField(primary_key=True, editable=True)
-    name = models.CharField('Название', max_length=300)
-    price = models.IntegerField('Цена', null=True, blank=True, default=None)
+    name = models.CharField(max_length=300)
+    price = models.IntegerField(null=True, blank=True, default=None)
     date = models.DateTimeField()
     type = models.CharField(max_length=50)
     parent = TreeForeignKey(

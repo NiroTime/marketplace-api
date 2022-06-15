@@ -6,6 +6,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from datetime import datetime
+import uuid
+
 from constants import *
 
 
@@ -58,7 +61,6 @@ def print_diff(expected, response):
 def test_import():
     for batch in IMPORT_BATCHES:
         status, _ = request("/imports", method="POST", data=batch)
-
         assert status == 200, f"Expected HTTP status code 200, got {status}"
 
     for batch in NEW_IMPORT_BATCH:
@@ -236,6 +238,34 @@ def test_parent_info_update_on_descendants_delete():
     print('Test parent info update on descendants delete passed')
 
 
+def test_900_items_batch():
+    cat = {
+        "type": "CATEGORY",
+        "name": "Товары",
+        "id": "069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
+        "parentId": None
+    }
+    batch = {
+        "items": [cat],
+        "updateDate": "2022-04-04T00:00:00.001Z"
+    }
+    for step in range(1, 900):
+        item = {
+            "id": str(uuid.uuid4()),
+            "name": str(step),
+            "parentId": "069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
+            "price": step * 100,
+            "type": "OFFER"
+        }
+        batch["items"].append(item)
+    start = datetime.now()
+    status, _ = request("/imports", method="POST", data=batch)
+    end = datetime.now()
+    print(end - start)
+    status, _ = request("/delete/069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
+                        method="DELETE")
+
+
 def test_delete():
     status, _ = request(f"/delete/{ROOT_ID}", method="DELETE")
     assert status == 200, f"Expected HTTP status code 200, got {status}"
@@ -257,6 +287,7 @@ def test_all():
     test_sales_return_correct_data()
     test_stats_show_correct_context()
     test_parent_info_update_on_descendants_delete()
+    test_900_items_batch()
     test_delete()
 
 

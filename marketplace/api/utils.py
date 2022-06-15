@@ -97,8 +97,7 @@ def request_data_validate(request_data):
         # Добавляем ключ parent если он определён
         if 'parentId' in item.keys() and item.get('parentId'):
             item['parent'] = item.get('parentId')
-        # Проверяем что parentID у всех итемов в запросе либо в базе,
-        # либо в текущем запросе, либо отсутствует, иначе ValidationError
+        # Проверяем что parentId отличается от id
         if item.get('parent'):
             if not uuid_validate(item.get('parent')) or (
                     item.get('id') == item.get('parent')):
@@ -115,7 +114,6 @@ def request_data_validate(request_data):
         parents_in_db = Item.objects.filter(
             pk__in=items_parent_id_set
         ).values_list('id')
-        print(parents_in_db)
         parents_in_db_id_set = {str(p[0]) for p in parents_in_db}
 
         for parent_id in items_parent_id_set:

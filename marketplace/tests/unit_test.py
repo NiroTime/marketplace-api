@@ -217,27 +217,6 @@ def test_stats_show_correct_context():
     print("Test stats show correct context passed.")
 
 
-def test_parent_info_update_on_descendants_delete():
-    status, response_before_delete = request(
-        f"/nodes/{ROOT_ID}", json_response=True
-    )
-
-    status, _ = request(
-        f"/delete/{DELETE_OFFER_WITH_MULTIPLE_ANCESTORS}", method="DELETE"
-    )
-    assert status == 200, f"Expected HTTP status code 200, got {status}"
-    _, response_after_delete = request(
-        f"/nodes/{ROOT_ID}", json_response=True
-    )
-    assert response_before_delete['price'] != response_after_delete['price'], (
-        f'Ancestors price doesnt change after descendant delete'
-    )
-    assert response_before_delete['date'] != response_after_delete['date'], (
-        f'Ancestors date doesnt change after descendant delete'
-    )
-    print('Test parent info update on descendants delete passed')
-
-
 def test_900_items_batch():
     cat = {
         "type": "CATEGORY",
@@ -260,6 +239,11 @@ def test_900_items_batch():
         batch["items"].append(item)
     start = datetime.now()
     status, _ = request("/imports", method="POST", data=batch)
+    end = datetime.now()
+    print(end - start)
+    start = datetime.now()
+    status, _ = request("/nodes/069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
+                        method="GET")
     end = datetime.now()
     print(end - start)
     status, _ = request("/delete/069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
@@ -286,7 +270,6 @@ def test_all():
     test_update_parent_id_for_item()
     test_sales_return_correct_data()
     test_stats_show_correct_context()
-    test_parent_info_update_on_descendants_delete()
     test_900_items_batch()
     test_delete()
 

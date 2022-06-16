@@ -60,21 +60,22 @@ def avg_children_price_and_date(parent):
     или None, если у категории нет детей с типом OFFER, и последнюю дату
     обновления.
     """
-    children = parent.get_descendants()
-    if children:
-        all_offers_price = 0
-        offers_count = 0
-        last_update = parent.date
-        for item in children:
-            if item.type == 'OFFER':
-                all_offers_price += item.price
-                offers_count += 1
-            if item.date > last_update:
-                last_update = item.date
-        try:
-            return all_offers_price // offers_count, last_update
-        except ZeroDivisionError:
-            return None, parent.date
+    if parent.type == 'CATEGORY':
+        children = parent.get_descendants()
+        if children:
+            all_offers_price = 0
+            offers_count = 0
+            last_update = parent.date
+            for item in children:
+                if item.type == 'OFFER':
+                    all_offers_price += item.price
+                    offers_count += 1
+                if item.date > last_update:
+                    last_update = item.date
+            try:
+                return all_offers_price // offers_count, last_update
+            except ZeroDivisionError:
+                return None, parent.date
     return None, parent.date
 
 
@@ -120,7 +121,7 @@ def request_data_validate(request_data):
             if (parent_id not in parents_in_db_id_set
                     and parent_id not in items_id_set):
                 raise serializers.ValidationError
-    return request_data['items']
+    return request_data['items'], items_id_set
 
 
 def create_item_archive_version(instance):

@@ -3,7 +3,6 @@ from datetime import timedelta
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from rest_framework import generics, serializers
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
@@ -53,7 +52,8 @@ class PostItemAPIView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         if not isinstance(request.data, dict):
             raise serializers.ValidationError
-        request_list = request_data_validate(request.data)
+        request_list, items_id_set = request_data_validate(request.data)
+        items_in_db = Item.objects.filter(id__in=items_id_set)
         step = 0
         temp_data = []
         with transaction.atomic():
@@ -62,14 +62,15 @@ class PostItemAPIView(generics.CreateAPIView):
                     # проверяем валидность Item, контолируем поведение, если
                     # родитель находится в запросе, а не в базе данных
                     item = request_list[step]
-                    current_item = Item.objects.filter(pk=item['id']).first()
+                    current_item = items_in_db.get(id=item['id'])
                     if not current_item:
                         serializer = self.get_serializer(data=item)
                         serializer.is_valid(raise_exception=True)
                         method = 'POST'
                     else:
-                        instance = current_item
-                        serializer = self.get_serializer(instance, data=item)
+                        serializer = self.get_serializer(
+                            current_item, data=item
+                        )
                         serializer.is_valid(raise_exception=True)
                         method = 'PUT'
 
@@ -92,9 +93,11 @@ class PostItemAPIView(generics.CreateAPIView):
                         step = 0
                         if method == 'PUT':
                             if getattr(
-                                    instance, '_prefetched_objects_cache', None
+                                    current_item,
+                                    '_prefetched_objects_cache',
+                                    None,
                             ):
-                                instance._prefetched_objects_cache = {}
+                                current_item._prefetched_objects_cache = {}
                     except Http404:
                         raise ItemNotInDBError
                 except ItemNotInDBError:
@@ -126,12 +129,7 @@ class DeleteItemAPIView(generics.DestroyAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
-        ancestors = instance.get_ancestors()
         self.perform_destroy(instance)
-        for item in ancestors:
-            item.date = timezone.now()
-            item.save()
-            create_item_archive_version(item).save()
         return Response(status=HTTP_200_OK)
 
 

@@ -18,6 +18,7 @@ class Item(MPTTModel):
 
 
 class ItemArchiveVersions(models.Model):
+    id = models.AutoField(primary_key=True)
     actual_version = models.CharField(max_length=36)
     name = models.CharField(max_length=300)
     price = models.IntegerField(null=True, blank=True, default=None)

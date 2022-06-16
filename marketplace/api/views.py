@@ -27,7 +27,6 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         if not uuid_validate(kwargs.get('pk')):
             raise serializers.ValidationError
         instance = self.get_object()
-        descendants = instance.get_descendants()
         if instance.type == 'OFFER':
             instance.children = None
         if not instance.price:
@@ -39,7 +38,7 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         serializer_data['date'] = validate_date(
             serializer_data['date']
         ).isoformat(sep='T', timespec='milliseconds') + 'Z'
-        self.get_all_children(serializer_data, descendants)
+        self.get_all_children(serializer_data)
         return Response(serializer_data)
 
 
@@ -62,7 +61,11 @@ class PostItemAPIView(generics.CreateAPIView):
                     # проверяем валидность Item, контолируем поведение, если
                     # родитель находится в запросе, а не в базе данных
                     item = request_list[step]
-                    current_item = items_in_db.get(id=item['id'])
+                    current_item = None
+                    for item_in_db in items_in_db:
+                        if item['id'] == str(item_in_db):
+                            current_item = item_in_db
+                            break
                     if not current_item:
                         serializer = self.get_serializer(data=item)
                         serializer.is_valid(raise_exception=True)

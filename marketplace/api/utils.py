@@ -60,22 +60,21 @@ def avg_children_price_and_date(parent):
     или None, если у категории нет детей с типом OFFER, и последнюю дату
     обновления.
     """
-    if parent.type == 'CATEGORY':
-        children = parent.get_descendants()
-        if children:
-            all_offers_price = 0
-            offers_count = 0
-            last_update = parent.date
-            for item in children:
-                if item.type == 'OFFER':
-                    all_offers_price += item.price
-                    offers_count += 1
-                if item.date > last_update:
-                    last_update = item.date
-            try:
-                return all_offers_price // offers_count, last_update
-            except ZeroDivisionError:
-                return None, parent.date
+    children = parent.get_descendants()
+    if children:
+        all_offers_price = 0
+        offers_count = 0
+        last_update = parent.date
+        for item in children:
+            if item.type == 'OFFER':
+                all_offers_price += item.price
+                offers_count += 1
+            if item.date > last_update:
+                last_update = item.date
+        try:
+            return all_offers_price // offers_count, last_update
+        except ZeroDivisionError:
+            return None, parent.date
     return None, parent.date
 
 
@@ -166,7 +165,7 @@ class ChangedListAPIView(generics.ListAPIView):
 
 class ChangedRetrieveAPIView(generics.RetrieveAPIView):
 
-    def get_all_children(self, data, descendants):
+    def get_all_children(self, data):
         """
         Рекурсивная функция распаковывающая детей
         у сериализованного объекта Item.
@@ -174,7 +173,9 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
         if data.get('children'):
             step = 0
             while step < len(data.get('children')):
-                item = descendants.get(id=data.get('children')[step])
+                item = Item.objects.filter(
+                    id=data.get('children')[step]
+                ).first()
                 if not item.price:
                     item.price, item.date = avg_children_price_and_date(item)
                 child = self.get_serializer(item).data
@@ -182,7 +183,7 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
                     child['date']
                 ).isoformat(sep='T', timespec='milliseconds') + 'Z'
                 data.get('children')[step] = child
-                self.get_all_children(child, descendants)
+                self.get_all_children(child)
                 step += 1
         elif data['type'] == 'OFFER':
             data['children'] = None

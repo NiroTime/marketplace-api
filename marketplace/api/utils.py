@@ -88,6 +88,7 @@ def request_data_validate(request_data):
         raise serializers.ValidationError
     items_id_list = []
     items_parent_id_set = set()
+    parents_in_db_id_dict = {}
     for item in request_data['items']:
         items_id_list.append(item.get('id'))
         item['date'] = request_data['updateDate']
@@ -111,16 +112,16 @@ def request_data_validate(request_data):
 
     # Убедимся, что родители всех Items находятся либо в БД, либо в запросе
     if items_parent_id_set:
-        parents_in_db = Item.objects.filter(
+        parents_in_db_list = Item.objects.filter(
             pk__in=items_parent_id_set
-        ).values_list('id')
-        parents_in_db_id_set = {str(p[0]) for p in parents_in_db}
+        )
+        parents_in_db_id_dict = {str(p): p for p in parents_in_db_list}
 
         for parent_id in items_parent_id_set:
-            if (parent_id not in parents_in_db_id_set
+            if (parent_id not in set(parents_in_db_id_dict.keys())
                     and parent_id not in items_id_set):
                 raise serializers.ValidationError
-    return request_data['items'], items_id_set
+    return request_data['items'], items_id_set, parents_in_db_id_dict
 
 
 def create_item_archive_version(instance):

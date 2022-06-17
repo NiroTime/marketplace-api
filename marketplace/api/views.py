@@ -2,7 +2,6 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.http import Http404
-from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
@@ -51,21 +50,22 @@ class PostItemAPIView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         if not isinstance(request.data, dict):
             raise serializers.ValidationError
-        request_list, items_id_set = request_data_validate(request.data)
-        items_in_db = Item.objects.filter(id__in=items_id_set)
+        request_list, items_id_set, parents_in_db_id_dict = \
+            request_data_validate(request.data)
+        items_in_db_dict = {
+            str(i): i for i in Item.objects.filter(id__in=items_id_set)
+        }
         step = 0
-        temp_data = []
         with transaction.atomic():
             while len(request_list) > 0:
                 try:
                     # проверяем валидность Item, контолируем поведение, если
                     # родитель находится в запросе, а не в базе данных
                     item = request_list[step]
-                    current_item = None
-                    for item_in_db in items_in_db:
-                        if item['id'] == str(item_in_db):
-                            current_item = item_in_db
-                            break
+                    try:
+                        current_item = items_in_db_dict[item['id']]
+                    except:
+                        current_item = None
                     if not current_item:
                         serializer = self.get_serializer(data=item)
                         serializer.is_valid(raise_exception=True)
@@ -84,14 +84,11 @@ class PostItemAPIView(generics.CreateAPIView):
                         if not item.get('parent'):
                             parent = None
                         else:
-                            parent = get_object_or_404(
-                                Item,
-                                pk=item.get('parent')
-                            )
+                            parent = parents_in_db_id_dict[item.get('parent')]
                             if parent.type != 'CATEGORY':
                                 raise serializers.ValidationError
-                        self.perform_create(serializer, parent)
-                        temp_data.append(serializer.validated_data.get('id'))
+                        fresh_item = self.perform_create(serializer, parent)
+                        parents_in_db_id_dict[str(fresh_item)] = fresh_item
                         request_list.remove(item)
                         step = 0
                         if method == 'PUT':
@@ -101,7 +98,7 @@ class PostItemAPIView(generics.CreateAPIView):
                                     None,
                             ):
                                 current_item._prefetched_objects_cache = {}
-                    except Http404:
+                    except KeyError:
                         raise ItemNotInDBError
                 except ItemNotInDBError:
                     step += 1
@@ -110,7 +107,7 @@ class PostItemAPIView(generics.CreateAPIView):
 
         # Созаём архивные версии категорий, затронутых текущим запросом
         archive_items_list = []
-        items = Item.objects.filter(pk__in=temp_data)
+        items = Item.objects.filter(pk__in=items_id_set)
         items_for_archiving = items.get_ancestors(include_self=True)
         for item in set(items_for_archiving):
             archive_items_list.append(
@@ -120,7 +117,8 @@ class PostItemAPIView(generics.CreateAPIView):
         return Response(status=HTTP_200_OK)
 
     def perform_create(self, serializer, parent):
-        serializer.save(parent=parent)
+        fresh_item = serializer.save(parent=parent)
+        return fresh_item
 
 
 class DeleteItemAPIView(generics.DestroyAPIView):

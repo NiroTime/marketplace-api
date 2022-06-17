@@ -1,5 +1,5 @@
-# API_BASEURL = "http://127.0.0.1"
-API_BASEURL = "https://motorcycles-1952.usr.yandex-academy.ru/"
+API_BASEURL = "http://127.0.0.1"
+# API_BASEURL = "https://motorcycles-1952.usr.yandex-academy.ru/"
 
 ROOT_ID = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
 

@@ -28,6 +28,9 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         instance = self.get_object()
         if instance.type == 'OFFER':
             instance.children = None
+        descendants = instance.get_descendants()
+        descendants_dict = {str(d): d for d in descendants}
+
         if not instance.price:
             instance.price, instance.date = avg_children_price_and_date(
                 instance
@@ -37,7 +40,7 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         serializer_data['date'] = validate_date(
             serializer_data['date']
         ).isoformat(sep='T', timespec='milliseconds') + 'Z'
-        self.get_all_children(serializer_data)
+        self.get_all_children(serializer_data, descendants_dict)
         return Response(serializer_data)
 
 

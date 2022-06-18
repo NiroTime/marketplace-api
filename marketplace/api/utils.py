@@ -166,7 +166,7 @@ class ChangedListAPIView(generics.ListAPIView):
 
 class ChangedRetrieveAPIView(generics.RetrieveAPIView):
 
-    def get_all_children(self, data):
+    def get_all_children(self, data, descendants_dict):
         """
         Рекурсивная функция распаковывающая детей
         у сериализованного объекта Item.
@@ -174,17 +174,15 @@ class ChangedRetrieveAPIView(generics.RetrieveAPIView):
         if data.get('children'):
             step = 0
             while step < len(data.get('children')):
-                item = Item.objects.filter(
-                    id=data.get('children')[step]
-                ).first()
-                if not item.price:
+                item = descendants_dict[str(data.get('children')[step])]
+                if item.type == 'CATEGORY':
                     item.price, item.date = avg_children_price_and_date(item)
                 child = self.get_serializer(item).data
                 child['date'] = validate_date(
                     child['date']
                 ).isoformat(sep='T', timespec='milliseconds') + 'Z'
                 data.get('children')[step] = child
-                self.get_all_children(child)
+                self.get_all_children(child, descendants_dict)
                 step += 1
         elif data['type'] == 'OFFER':
             data['children'] = None

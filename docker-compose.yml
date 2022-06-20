@@ -11,15 +11,29 @@ services:
       - ./.env
     depends_on:
       - db
+      - redis
+
+  celery-worker:
+    build: ./marketplace
+    restart: always
+    command: celery --app=marketplace worker -l info
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+      - redis
+
   db:
     image: postgres:12.0-alpine
     restart: always
     volumes:
       - postgres_volume:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_USER=django_user
-      - POSTGRES_PASSWORD=django_password
-      - POSTGRES_DB=django_db
+    env_file:
+      - ./.env
+
+#  redis:
+#    image: redis:6.0.8-alpine
+#    restart: always
 
 volumes:
   postgres_volume:

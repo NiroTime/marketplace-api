@@ -10,10 +10,10 @@ from .models import Item, ItemArchiveVersions
 from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
                           SalesItemSerializer)
+from .tasks import save_archive_versions
 from .utils import (ChangedListAPIView, ChangedRetrieveAPIView,
                     ItemNotInDBError, avg_children_price_and_date,
-                    uuid_validate, validate_date, create_item_archive_version,
-                    request_data_validate, )
+                    uuid_validate, validate_date, request_data_validate, )
 
 
 class GetItemAPIView(ChangedRetrieveAPIView):
@@ -28,13 +28,13 @@ class GetItemAPIView(ChangedRetrieveAPIView):
         instance = self.get_object()
         if instance.type == 'OFFER':
             instance.children = None
-        descendants = instance.get_descendants()
-        descendants_dict = {str(d): d for d in descendants}
+            descendants_dict = None
 
-        if not instance.price:
+        else:
             instance.price, instance.date = avg_children_price_and_date(
                 instance
             )
+            descendants_dict = {str(d): d for d in instance.get_descendants()}
         serializer = self.get_serializer(instance)
         serializer_data = serializer.data
         serializer_data['date'] = validate_date(
@@ -53,10 +53,10 @@ class PostItemAPIView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         if not isinstance(request.data, dict):
             raise serializers.ValidationError
-        request_list, items_id_set, parents_in_db_id_dict = \
+        request_list, items_id_list, parents_in_db_id_dict = \
             request_data_validate(request.data)
         items_in_db_dict = {
-            str(i): i for i in Item.objects.filter(id__in=items_id_set)
+            str(i): i for i in Item.objects.filter(id__in=items_id_list)
         }
         step = 0
         with transaction.atomic():
@@ -67,18 +67,16 @@ class PostItemAPIView(generics.CreateAPIView):
                     item = request_list[step]
                     try:
                         current_item = items_in_db_dict[item['id']]
-                    except:
+                    except KeyError:
                         current_item = None
                     if not current_item:
                         serializer = self.get_serializer(data=item)
                         serializer.is_valid(raise_exception=True)
-                        method = 'POST'
                     else:
                         serializer = self.get_serializer(
                             current_item, data=item
                         )
                         serializer.is_valid(raise_exception=True)
-                        method = 'PUT'
 
                     try:
                         # Проверяем должен ли у Item быть родитель, если нет -
@@ -94,13 +92,6 @@ class PostItemAPIView(generics.CreateAPIView):
                         parents_in_db_id_dict[str(fresh_item)] = fresh_item
                         request_list.remove(item)
                         step = 0
-                        if method == 'PUT':
-                            if getattr(
-                                    current_item,
-                                    '_prefetched_objects_cache',
-                                    None,
-                            ):
-                                current_item._prefetched_objects_cache = {}
                     except KeyError:
                         raise ItemNotInDBError
                 except ItemNotInDBError:
@@ -109,14 +100,7 @@ class PostItemAPIView(generics.CreateAPIView):
                     raise serializers.ValidationError
 
         # Созаём архивные версии категорий, затронутых текущим запросом
-        archive_items_list = []
-        items = Item.objects.filter(pk__in=items_id_set)
-        items_for_archiving = items.get_ancestors(include_self=True)
-        for item in set(items_for_archiving):
-            archive_items_list.append(
-                create_item_archive_version(instance=item)
-            )
-        ItemArchiveVersions.objects.bulk_create(archive_items_list)
+        save_archive_versions.delay(items_id_list)
         return Response(status=HTTP_200_OK)
 
     def perform_create(self, serializer, parent):

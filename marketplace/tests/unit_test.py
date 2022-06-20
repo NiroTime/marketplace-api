@@ -241,13 +241,11 @@ def test_900_items_batch():
     status, _ = request("/imports", method="POST", data=batch)
     end = datetime.now()
     print(end - start)
-    start = datetime.now()
-    status, _ = request("/nodes/069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
-                        method="GET")
-    end = datetime.now()
-    print(end - start)
-    status, _ = request("/delete/069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
-                        method="DELETE")
+    # start = datetime.now()
+    # status, _ = request("/nodes/069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
+    #                     method="GET")
+    # end = datetime.now()
+    # print(end - start)
 
 
 def test_delete():
@@ -257,6 +255,9 @@ def test_delete():
     status, _ = request(f"/nodes/{ROOT_ID}", json_response=True)
     assert status == 404, f"Expected HTTP status code 404, got {status}"
 
+    status, _ = request("/delete/069cb8d7-bbdd-47d3-ad8f-39ef4c269df1",
+                        method="DELETE")
+    assert status == 200, f"Expected HTTP status code 200, got {status}"
     print("Test delete passed.")
 
 

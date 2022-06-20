@@ -74,7 +74,7 @@ def avg_children_price_and_date(parent):
         try:
             return all_offers_price // offers_count, last_update
         except ZeroDivisionError:
-            return None, parent.date
+            return None, last_update
     return None, parent.date
 
 
@@ -121,7 +121,7 @@ def request_data_validate(request_data):
             if (parent_id not in set(parents_in_db_id_dict.keys())
                     and parent_id not in items_id_set):
                 raise serializers.ValidationError
-    return request_data['items'], items_id_set, parents_in_db_id_dict
+    return request_data['items'], items_id_list, parents_in_db_id_dict
 
 
 def create_item_archive_version(instance):

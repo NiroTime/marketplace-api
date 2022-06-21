@@ -11,9 +11,9 @@ from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           ItemStatisticSerializer, PutItemSerializer,
                           SalesItemSerializer)
 from .tasks import save_archive_versions
-from .utils import (ChangedListAPIView, ChangedRetrieveAPIView,
-                    ItemNotInDBError, avg_children_price_and_date,
+from .utils import (ItemNotInDBError, avg_children_price_and_date,
                     uuid_validate, validate_date, request_data_validate, )
+from .mixins import ChangedListAPIView, ChangedRetrieveAPIView
 
 
 class GetItemAPIView(ChangedRetrieveAPIView):
@@ -98,7 +98,6 @@ class PostItemAPIView(generics.CreateAPIView):
                     step += 1
                 except Exception:
                     raise serializers.ValidationError
-
         # Созаём архивные версии категорий, затронутых текущим запросом
         save_archive_versions.delay(items_id_list)
         return Response(status=HTTP_200_OK)

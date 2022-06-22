@@ -16,3 +16,4 @@ Yandex academy test task
 
 1) Склонируйте репозиторий: git clone https://github.com/NiroTime/marketplace-api
 2) В дерикрории ~/marketplace запустите контейнеры: docker-compose up -d
+3) Выполните миграции: docker-compose exec web python manage.py migrate --noinput

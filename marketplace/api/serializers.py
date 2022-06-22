@@ -1,10 +1,12 @@
 from rest_framework import serializers
 
+from .mixins import MyDateTimeField
 from .models import Item, ItemArchiveVersions
 
 
 class GetItemSerializer(serializers.ModelSerializer):
     parentId = serializers.UUIDField(source='parent')
+    date = MyDateTimeField()
 
     class Meta:
         model = Item
@@ -43,6 +45,7 @@ class DeleteItemSerializer(serializers.ModelSerializer):
 
 
 class SalesItemSerializer(serializers.ModelSerializer):
+    date = MyDateTimeField()
 
     class Meta:
         model = Item
@@ -51,6 +54,7 @@ class SalesItemSerializer(serializers.ModelSerializer):
 
 class ItemStatisticSerializer(serializers.ModelSerializer):
     id = serializers.CharField(source='actual_version')
+    date = MyDateTimeField()
 
     class Meta:
         model = ItemArchiveVersions

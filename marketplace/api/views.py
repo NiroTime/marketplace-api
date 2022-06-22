@@ -12,7 +12,7 @@ from .serializers import (DeleteItemSerializer, GetItemSerializer,
                           SalesItemSerializer)
 from .tasks import save_archive_versions
 from .utils import (ItemNotInDBError, avg_children_price_and_date,
-                    uuid_validate, validate_date, request_data_validate, )
+                    validate_date, request_data_validate, uuid_validate, )
 from .mixins import ChangedListAPIView, ChangedRetrieveAPIView
 
 
@@ -37,9 +37,6 @@ class GetItemAPIView(ChangedRetrieveAPIView):
             descendants_dict = {str(d): d for d in instance.get_descendants()}
         serializer = self.get_serializer(instance)
         serializer_data = serializer.data
-        serializer_data['date'] = validate_date(
-            serializer_data['date']
-        ).isoformat(sep='T', timespec='milliseconds') + 'Z'
         self.get_all_children(serializer_data, descendants_dict)
         return Response(serializer_data)
 
@@ -155,25 +152,14 @@ class ItemStatisticAPIView(ChangedListAPIView):
         end_date = validate_date(self.request.query_params.get('dateEnd'))
         if start_date and end_date and start_date > end_date:
             raise serializers.ValidationError
-        if start_date and end_date:
-            queryset = ItemArchiveVersions.objects.filter(
-                actual_version=str(self.kwargs.get('pk')),
-                date__range=(start_date, end_date),
-            )
-        elif start_date:
-            queryset = ItemArchiveVersions.objects.filter(
-                actual_version=str(self.kwargs.get('pk')),
-                date__gte=start_date,
-            )
-        elif end_date:
-            queryset = ItemArchiveVersions.objects.filter(
-                actual_version=str(self.kwargs.get('pk')),
-                date__lte=end_date,
-            )
-        else:
-            queryset = ItemArchiveVersions.objects.filter(
-                actual_version=str(self.kwargs.get('pk'))
-            )
+
+        queryset = ItemArchiveVersions.objects.filter(
+            actual_version=str(self.kwargs.get('pk'))
+        )
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
 
         if not queryset:
             raise Http404

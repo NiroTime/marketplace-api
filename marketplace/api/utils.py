@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 
+from django.db.models import Avg, Max
 from django.http import Http404
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -60,22 +61,13 @@ def avg_children_price_and_date(parent):
     или None, если у категории нет детей с типом OFFER, и последнюю дату
     обновления.
     """
-    children = parent.get_descendants()
-    if children:
-        all_offers_price = 0
-        offers_count = 0
-        last_update = parent.date
-        for item in children:
-            if item.type == 'OFFER':
-                all_offers_price += item.price
-                offers_count += 1
-            if item.date > last_update:
-                last_update = item.date
-        try:
-            return all_offers_price // offers_count, last_update
-        except ZeroDivisionError:
-            return None, last_update
-    return None, parent.date
+    price = parent.get_descendants().filter(
+        type='OFFER'
+    ).aggregate(Avg('price'))
+    date = parent.get_descendants(include_self=True).aggregate(Max('date'))
+    if price['price__avg']:
+        return int(price['price__avg']), date['date__max']
+    return None, date['date__max']
 
 
 def request_data_validate(request_data):
